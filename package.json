@@ -1,0 +1,30 @@
+{
+  "name": "@ideaspaces/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for IdeaSpaces — the standardized layer between agents and the knowledge space",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  },
+  "license": "MIT"
+}

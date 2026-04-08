@@ -36,7 +36,7 @@ import type {
   GitOpsResult,
 } from "./types.js";
 
-export const DEFAULT_API_URL = "https://api.starwatcher.ai";
+export const DEFAULT_API_URL = "https://api.ideaspaces.xyz";
 
 export class IsClient {
   private transport: IsTransport;

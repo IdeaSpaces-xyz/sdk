@@ -11,7 +11,7 @@
 export interface IsClientConfig {
   /** API key for authentication. */
   apiKey: string;
-  /** API base URL. Default: https://api.starwatcher.ai */
+  /** API base URL. Default: https://api.ideaspaces.xyz */
   apiUrl?: string;
   /** Repo ID. Auto-discovered if omitted and user has exactly one repo. */
   repo?: string;

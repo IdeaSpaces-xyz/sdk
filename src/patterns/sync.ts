@@ -223,6 +223,9 @@ export async function syncToSpace(
     onProgress?: (msg: string) => void;
   } = {},
 ): Promise<SyncResult> {
+  // Normalize spacePath — strip trailing slash to avoid double-slash in paths
+  spacePath = spacePath.replace(/\/+$/, "");
+
   const log = options.onProgress || (() => {});
   const result: SyncResult = {
     uploaded: [],

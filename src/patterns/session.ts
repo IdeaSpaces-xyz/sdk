@@ -44,10 +44,13 @@ export interface IsSession {
   invalidate(): void;
 }
 
-export function createSession(client: IsClient): IsSession {
+export function createSession(
+  client: IsClient,
+  opts?: { lastSha?: string | null },
+): IsSession {
   let cachedAwareness: string | null = null;
   let knownHeadSha: string | null = null;
-  let lastSha: string | null = null; // HEAD from previous session / before this one
+  let lastSha: string | null = opts?.lastSha ?? null; // HEAD from previous session / before this one
 
   async function getCurrentHead(): Promise<string | null> {
     try {
@@ -80,11 +83,11 @@ export function createSession(client: IsClient): IsSession {
     }
 
     // Top-level tree
-    const dirs = root.children.filter(
-      (c: NavigateResult["children"][0]) => c.type === "directory",
+    const dirs = root.children.filter((c: NavigateResult["children"][0]) =>
+      c.type === "directory" || c.type === "dir",
     );
     const files = root.children.filter(
-      (c: NavigateResult["children"][0]) => c.type === "file",
+      (c: NavigateResult["children"][0]) => c.type !== "directory" && c.type !== "dir",
     );
     if (dirs.length || files.length) {
       lines.push(`\nTree (${root.file_count} files):`);

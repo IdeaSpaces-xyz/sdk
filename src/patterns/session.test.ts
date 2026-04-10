@@ -60,6 +60,37 @@ describe("createSession", () => {
     expect(block).toContain("Agent context: guidance");
   });
 
+  it("getAwarenessBlock includes changes when lastSha is provided", async () => {
+    const client = createClient({
+      transport: createMockTransport({
+        "GET /repos/r1/tree": mockNav,
+        "GET /repos/r1/git": (_method: string, path: string) => {
+          const query = path.split("?")[1] || "";
+          const params = new URLSearchParams(query);
+          const op = params.get("op");
+          if (op === "changes") {
+            return {
+              op: "changes",
+              changes: [
+                { status: "M", path: "dealflow/acme.md" },
+                { status: "A", path: "industries/fintech.md" },
+              ],
+            };
+          }
+          return mockLog;
+        },
+      }),
+      repo: "r1",
+    });
+
+    const session = createSession(client, { lastSha: "old-sha" });
+    const block = await session.getAwarenessBlock();
+
+    expect(block).toContain("Since last session (2 changes):");
+    expect(block).toContain("M dealflow/acme.md");
+    expect(block).toContain("A industries/fintech.md");
+  });
+
   it("getAwarenessBlock caches — second call returns same without API", async () => {
     let callCount = 0;
     const client = createClient({

@@ -84,6 +84,19 @@ export interface RepoInfo {
   description?: string;
 }
 
+export interface CreateRepoBody {
+  name: string;
+  slug?: string;
+  purpose?: string;
+  hostname?: string | null;
+}
+
+export interface CreateRepoResult {
+  repo_id: string;
+  slug: string;
+  name: string;
+}
+
 export interface OutlineItem {
   type: "branch" | "note" | "perspective" | "skill" | "agent_context";
   path: string;
@@ -137,7 +150,13 @@ export interface SearchParams {
   node_type?: string;
   attached_to?: string;
   contributed_by?: string;
+  /** Preferred API field. */
+  tag?: string;
+  /** Backward-compatible alias for `tag`. */
   tags?: string;
+  /** Preferred API field. */
+  top_k?: number;
+  /** Backward-compatible alias for `top_k`. */
   limit?: number;
 }
 

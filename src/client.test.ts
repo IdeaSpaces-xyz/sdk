@@ -57,6 +57,23 @@ describe("createClient", () => {
     expect(resp.data.results[0].name).toBe("Acme Analysis");
   });
 
+  it("search sends both legacy and new filter params", async () => {
+    let seenPath = "";
+    const client = makeClient({
+      "GET /search": (_method: string, path: string) => {
+        seenPath = path;
+        return mockSearch;
+      },
+    });
+
+    await client.search({ query: "acme", tag: "fintech", top_k: 7 });
+
+    expect(seenPath).toContain("tag=fintech");
+    expect(seenPath).toContain("tags=fintech");
+    expect(seenPath).toContain("top_k=7");
+    expect(seenPath).toContain("limit=7");
+  });
+
   it("readFile with windowed read", async () => {
     const mockFile = {
       path: "docs/test.md",
@@ -101,6 +118,18 @@ describe("createClient", () => {
     expect(resp.data.repos).toHaveLength(1);
   });
 
+  it("createRepo returns repo metadata", async () => {
+    const client = createClient({
+      transport: createMockTransport({
+        "POST /repos": { repo_id: "r2", slug: "vc", name: "VC Space" },
+      }),
+    });
+
+    const resp = await client.createRepo({ name: "VC Space", slug: "vc" });
+    expect(resp.data.repo_id).toBe("r2");
+    expect(resp.data.slug).toBe("vc");
+  });
+
   it("throws when repoId accessed without repo", () => {
     const client = createClient({
       transport: createMockTransport({}),
@@ -117,6 +146,21 @@ describe("createClient", () => {
     client.setRepo("new_repo");
     const resp = await client.navigate();
     expect(resp.data.readme).toBe("# My Space");
+  });
+
+  it("navigate normalizes dir child type to directory", async () => {
+    const client = createClient({
+      transport: createMockTransport({
+        "GET /repos/new_repo/tree": {
+          ...mockNav,
+          children: [{ name: "dealflow", type: "dir", file_count: 2 }],
+        },
+      }),
+    });
+    client.setRepo("new_repo");
+
+    const resp = await client.navigate();
+    expect(resp.data.children[0].type).toBe("directory");
   });
 
   it("gitOps passes params", async () => {

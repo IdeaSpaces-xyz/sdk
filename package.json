@@ -27,5 +27,12 @@
     "typescript": "^5.8.3",
     "vitest": "^3.1.1"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IdeaSpaces-xyz/sdk"
+  }
 }

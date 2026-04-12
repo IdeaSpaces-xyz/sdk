@@ -13,6 +13,8 @@ import type {
   IsTransport,
   SdkResponse,
   RepoInfo,
+  CreateRepoBody,
+  CreateRepoResult,
   OutlineResult,
   NavigateResult,
   SearchParams,
@@ -102,6 +104,10 @@ export class IsClient {
     return this.req("GET", "/repos");
   }
 
+  async createRepo(body: CreateRepoBody): Promise<SdkResponse<CreateRepoResult>> {
+    return this.req("POST", "/repos", body);
+  }
+
   // ─── Outline ──────────────────────────────────────────────────
 
   async outline(): Promise<SdkResponse<OutlineResult>> {
@@ -112,7 +118,18 @@ export class IsClient {
 
   async navigate(path: string = ""): Promise<SdkResponse<NavigateResult>> {
     const encodedPath = path ? `/${encodeURIComponent(path)}` : "";
-    return this.req("GET", `/repos/${this.repoId}/tree${encodedPath}`);
+    const resp = await this.req<NavigateResult>(
+      "GET",
+      `/repos/${this.repoId}/tree${encodedPath}`,
+    );
+
+    // API returns `dir`; normalize to `directory` for SDK consumers.
+    resp.data.children = resp.data.children.map((child) => ({
+      ...child,
+      type: child.type === "dir" ? "directory" : child.type,
+    }));
+
+    return resp;
   }
 
   // ─── Search ───────────────────────────────────────────────────
@@ -127,8 +144,21 @@ export class IsClient {
     if (params.node_type) qs.set("node_type", params.node_type);
     if (params.attached_to) qs.set("attached_to", params.attached_to);
     if (params.contributed_by) qs.set("contributed_by", params.contributed_by);
-    if (params.tags) qs.set("tags", params.tags);
-    if (params.limit) qs.set("limit", String(params.limit));
+
+    const tag = params.tag ?? params.tags;
+    if (tag) {
+      // Send both keys for API compatibility across versions.
+      qs.set("tag", tag);
+      qs.set("tags", tag);
+    }
+
+    const topK = params.top_k ?? params.limit;
+    if (typeof topK === "number") {
+      // Send both keys for API compatibility across versions.
+      qs.set("top_k", String(topK));
+      qs.set("limit", String(topK));
+    }
+
     return this.req("GET", `/search?${qs.toString()}`);
   }
 

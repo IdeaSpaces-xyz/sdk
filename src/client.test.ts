@@ -130,6 +130,40 @@ describe("createClient", () => {
     expect(resp.data.slug).toBe("vc");
   });
 
+  it("connectRepo returns repo metadata", async () => {
+    const client = createClient({
+      transport: createMockTransport({
+        "POST /repos/connect": { repo_id: "r3", slug: "ideaspace", name: "IdeaSpace" },
+      }),
+    });
+
+    const resp = await client.connectRepo({
+      origin_url: "https://github.com/IdeaSpaces-xyz/ideaspace.git",
+      name: "IdeaSpace",
+      slug: "ideaspace",
+    });
+
+    expect(resp.data.repo_id).toBe("r3");
+    expect(resp.data.slug).toBe("ideaspace");
+  });
+
+  it("reindexRepo posts to repo-scoped endpoint", async () => {
+    const client = makeClient({
+      "POST /repos/repo_test/reindex": {
+        repo_id: "repo_test",
+        removed_entries: 12,
+        indexed_files: 34,
+        status: "ok",
+      },
+    });
+
+    const resp = await client.reindexRepo();
+    expect(resp.data.repo_id).toBe("repo_test");
+    expect(resp.data.removed_entries).toBe(12);
+    expect(resp.data.indexed_files).toBe(34);
+    expect(resp.data.status).toBe("ok");
+  });
+
   it("throws when repoId accessed without repo", () => {
     const client = createClient({
       transport: createMockTransport({}),

@@ -97,6 +97,20 @@ export interface CreateRepoResult {
   name: string;
 }
 
+export interface ConnectRepoBody {
+  origin_url: string;
+  name: string;
+  slug?: string;
+  hostname?: string | null;
+}
+
+export interface ReindexRepoResult {
+  repo_id: string;
+  removed_entries: number;
+  indexed_files: number;
+  status: string;
+}
+
 export interface OutlineItem {
   type: "branch" | "note" | "perspective" | "skill" | "agent_context";
   path: string;

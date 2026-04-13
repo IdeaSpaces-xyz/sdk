@@ -15,6 +15,8 @@ import type {
   RepoInfo,
   CreateRepoBody,
   CreateRepoResult,
+  ConnectRepoBody,
+  ReindexRepoResult,
   OutlineResult,
   NavigateResult,
   SearchParams,
@@ -106,6 +108,14 @@ export class IsClient {
 
   async createRepo(body: CreateRepoBody): Promise<SdkResponse<CreateRepoResult>> {
     return this.req("POST", "/repos", body);
+  }
+
+  async connectRepo(body: ConnectRepoBody): Promise<SdkResponse<CreateRepoResult>> {
+    return this.req("POST", "/repos/connect", body);
+  }
+
+  async reindexRepo(repoId: string = this.repoId): Promise<SdkResponse<ReindexRepoResult>> {
+    return this.req("POST", `/repos/${repoId}/reindex`);
   }
 
   // ─── Outline ──────────────────────────────────────────────────

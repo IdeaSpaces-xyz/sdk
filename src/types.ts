@@ -208,6 +208,14 @@ export interface WriteFileBody {
   if_match?: string;
 }
 
+export interface WriteFileOptions {
+  /**
+   * Bypass SDK auto-CAS behavior and send write as-is.
+   * Use for intentional overwrite flows.
+   */
+  force?: boolean;
+}
+
 export interface WriteResult {
   path: string;
   node_id: string;

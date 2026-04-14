@@ -7,7 +7,7 @@
  * Uses the transport layer for resilient HTTP (retry, backoff, error classification).
  */
 
-import { createFetchTransport } from "./transport.js";
+import { SdkError, createFetchTransport } from "./transport.js";
 import type {
   IsClientConfig,
   IsTransport,
@@ -23,6 +23,7 @@ import type {
   SearchResult,
   FileResult,
   WriteFileBody,
+  WriteFileOptions,
   WriteResult,
   GrepResult,
   GrepSectionsResult,
@@ -192,14 +193,36 @@ export class IsClient {
     return this.req("GET", `/repos/${this.repoId}/nodes/${nodeId}`);
   }
 
+  private async _withDefaultIfMatch(
+    path: string,
+    body: WriteFileBody,
+    opts?: WriteFileOptions,
+  ): Promise<WriteFileBody> {
+    if (opts?.force || body.if_match !== undefined) return body;
+
+    try {
+      const { data } = await this.readFile(path);
+      if (!data.last_commit_sha) return body;
+      return { ...body, if_match: data.last_commit_sha };
+    } catch (error) {
+      if (error instanceof SdkError && error.status === 404) {
+        // Missing file: treat as create path, no CAS precondition.
+        return body;
+      }
+      throw error;
+    }
+  }
+
   async writeFile(
     path: string,
     body: WriteFileBody,
+    opts?: WriteFileOptions,
   ): Promise<SdkResponse<WriteResult>> {
+    const payload = await this._withDefaultIfMatch(path, body, opts);
     return this.req(
       "PUT",
       `/repos/${this.repoId}/files/${encodeURIComponent(path)}`,
-      body,
+      payload,
     );
   }
 

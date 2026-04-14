@@ -92,12 +92,27 @@ describe("createClient", () => {
     expect(resp.data.continuation?.remaining).toBe(39);
   });
 
-  it("writeFile sends body", async () => {
+  it("writeFile defaults if_match from current file sha", async () => {
+    let seenBody: Record<string, unknown> | undefined;
     const client = makeClient({
-      "PUT /repos/repo_test/files/test.md": {
+      "GET /repos/repo_test/files/test.md": {
         path: "test.md",
-        node_id: "n_789",
-        commit_sha: "abc123",
+        node_id: "n_123",
+        content: "# Old",
+        total_lines: 1,
+        frontmatter: { name: "Test" },
+        node_type: "note",
+        tags: [],
+        attached_to: [],
+        last_commit_sha: "abc123",
+      },
+      "PUT /repos/repo_test/files/test.md": (_method: string, _path: string, body: unknown) => {
+        seenBody = body as Record<string, unknown>;
+        return {
+          path: "test.md",
+          node_id: "n_789",
+          commit_sha: "def456",
+        };
       },
     });
     const resp = await client.writeFile("test.md", {
@@ -105,7 +120,71 @@ describe("createClient", () => {
       name: "Hello",
     });
     expect(resp.data.node_id).toBe("n_789");
-    expect(resp.data.commit_sha).toBe("abc123");
+    expect(resp.data.commit_sha).toBe("def456");
+    expect(seenBody?.if_match).toBe("abc123");
+  });
+
+  it("writeFile skips auto-CAS when file is missing", async () => {
+    let seenBody: Record<string, unknown> | undefined;
+    const client = makeClient({
+      "PUT /repos/repo_test/files/new.md": (_method: string, _path: string, body: unknown) => {
+        seenBody = body as Record<string, unknown>;
+        return {
+          path: "new.md",
+          node_id: "n_new",
+          commit_sha: "ghi789",
+        };
+      },
+    });
+
+    const resp = await client.writeFile("new.md", {
+      content: "# New",
+      name: "New",
+    });
+
+    expect(resp.data.node_id).toBe("n_new");
+    expect(seenBody?.if_match).toBeUndefined();
+  });
+
+  it("writeFile supports force option to bypass auto-CAS", async () => {
+    let readCalls = 0;
+    let seenBody: Record<string, unknown> | undefined;
+    const client = makeClient({
+      "GET /repos/repo_test/files/test.md": () => {
+        readCalls += 1;
+        return {
+          path: "test.md",
+          node_id: "n_123",
+          content: "# Old",
+          total_lines: 1,
+          frontmatter: { name: "Test" },
+          node_type: "note",
+          tags: [],
+          attached_to: [],
+          last_commit_sha: "abc123",
+        };
+      },
+      "PUT /repos/repo_test/files/test.md": (_method: string, _path: string, body: unknown) => {
+        seenBody = body as Record<string, unknown>;
+        return {
+          path: "test.md",
+          node_id: "n_789",
+          commit_sha: "def456",
+        };
+      },
+    });
+
+    await client.writeFile(
+      "test.md",
+      {
+        content: "# Hello",
+        name: "Hello",
+      },
+      { force: true },
+    );
+
+    expect(readCalls).toBe(0);
+    expect(seenBody?.if_match).toBeUndefined();
   });
 
   it("listRepos works without repo set", async () => {

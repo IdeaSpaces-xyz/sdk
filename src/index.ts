@@ -17,9 +17,3 @@ export { watchForChanges } from "./patterns/watch.js";
 export type { ChangeResult } from "./patterns/watch.js";
 export { autoSelectRepo } from "./patterns/repo.js";
 export type { RepoDiscoveryResult } from "./patterns/repo.js";
-export {
-  syncToSpace,
-  resolveLinks,
-  normalizeFilename,
-} from "./patterns/sync.js";
-export type { SyncResult } from "./patterns/sync.js";

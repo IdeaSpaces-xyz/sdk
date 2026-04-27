@@ -1,19 +1,7 @@
 // @ideaspaces/sdk
 
-// Core
-export { createClient, IsClient, DEFAULT_API_URL } from "./client.js";
-export {
-  SdkError,
-  createFetchTransport,
-  createMockTransport,
-} from "./transport.js";
-export type { FetchTransportConfig, MockRoutes } from "./transport.js";
+// Stable type contract; useful for both local and future remote primitives.
 export * from "./types.js";
 
-// Patterns
-export { createSession } from "./patterns/session.js";
-export type { IsSession } from "./patterns/session.js";
-export { watchForChanges } from "./patterns/watch.js";
-export type { ChangeResult } from "./patterns/watch.js";
-export { autoSelectRepo } from "./patterns/repo.js";
-export type { RepoDiscoveryResult } from "./patterns/repo.js";
+// Local primitives (findSpaceRoot, awareness assembly, frontmatter utilities,
+// reframed createSession) recompose here in a follow-up build pass.

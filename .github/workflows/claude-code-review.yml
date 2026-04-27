@@ -1,0 +1,95 @@
+name: SLC Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+jobs:
+  slc-review:
+    if: |
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-review') &&
+      !contains(github.event.pull_request.labels.*.name, 'tiny')
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run SLC Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Review this pull request using our SLC (Simple, Lovable, Complete) principles for the IdeaSpaces SDK.
+
+            ## Context
+            - This repo: TypeScript ESM library (`@ideaspaces/sdk`). Local-first primitives (`findSpaceRoot`, `assembleAwareness`, `stripFrontmatter`, `composeFrontmatter`) plus a frozen-for-revival type contract from the legacy server-bound surface (`types.ts`).
+            - Stable contract: types in `types.ts` are intentionally preserved for the future sync surface; new local types co-locate with their modules.
+            - No runtime deps; ESM-only output via `tsc`. Tests via vitest.
+            - Reference: monorepo CLAUDE.md (root principles), ideaspace/architecture/plans/plugin-local-first/scope-review.md (the build-sweep design).
+
+            ## SLC label context
+            - `slc:simple` / `slc:lovable` / `slc:complete`: quick validation for labeled dimensions, deeper review for unlabeled.
+            - `needs:slc-review`: do deeper analysis.
+            - No SLC labels: standard full review.
+
+            ## SLC Framework Review
+
+            ### Simple 🎯
+            - Is this the simplest implementation that solves the problem?
+            - Functional API preferred over class wrappers unless state lifecycle earns one.
+            - Does it avoid pulling in deps when stdlib + Node primitives would do (filesystem, child_process, no js-yaml unless real semantic parsing is needed)?
+            - Any unnecessary new abstractions?
+
+            ### Lovable ❤️
+            - Public API ergonomics: clear types, predictable defaults, error paths fail safely.
+            - Replace-semantics for `composeFrontmatter`: caller owns all fields they want set.
+            - Graceful degradation: filesystem absences and external-tool failures (git, etc.) handled silently when appropriate.
+            - Consumer experience: cli, mcp-server, plugin's hook should compose primitives without ceremony.
+
+            ### Complete 🏁
+            - Tests cover happy paths AND edge cases (vitest with tmpdir fixtures preferred for fs-touching primitives)?
+            - No leftover server-bound dead code, transport stubs, or unused imports.
+            - `tsc --noEmit` clean; `npm test` passes; `npm run build` produces ESM in `dist/`.
+            - Type exports (re-exports in `index.ts`) cover what consumers actually need.
+
+            ## SDK-specific checks
+            - **Stable contract preservation.** Don't modify legacy types in `types.ts` without a clear reason; new local types co-locate with their module.
+            - **No filesystem writes from read-style primitives.** `findSpaceRoot`, `assembleAwareness`, `stripFrontmatter` are read-only.
+            - **Functional API preferred** over stateful classes unless lifecycle truly demands one.
+            - **Cross-platform paths** via `node:path` (no string concatenation with `/`).
+            - **Async by default** for any I/O.
+
+            ## Anti-pattern detection 🚨
+            - Reintroducing server-bound code (the strip is intentional; sync revival is a future, separate effort).
+            - Speculative API surface that no consumer needs yet.
+            - Adding deps without earning them (the sdk has zero runtime deps; stdlib + Node primitives first).
+            - Test fixtures that depend on the project's own ideaspace tree (use tmpdir).
+
+            ## Output format
+
+            **SLC Assessment:**
+            - ✅/⚠️/❌ Simple: [brief assessment]
+            - ✅/⚠️/❌ Lovable: [brief assessment]
+            - ✅/⚠️/❌ Complete: [brief assessment]
+
+            **Anti-Patterns Found:** [list or "None detected"]
+
+            **SDK-Specific Issues:** [list or "None detected"]
+
+            **Detailed Feedback:** [specific issues and suggestions]
+
+            **Recommendation:** Approve / Request Changes / Comment
+
+            Use `gh pr comment` to post your review.
+
+          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'

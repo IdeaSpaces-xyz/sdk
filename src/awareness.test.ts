@@ -95,6 +95,16 @@ describe("assembleAwareness", () => {
     expect(block).toContain("now — Shipping the local-first pivot this week.");
   });
 
+  it("falls back to first content line when frontmatter present but missing summary", async () => {
+    await makeAgent(tmp, {
+      "now.md":
+        "---\nname: Now\ntags: [active]\n---\n# Now\n\nShipping the local-first pivot this week.",
+    });
+    const space = await findSpaceRoot(tmp);
+    const block = await assembleAwareness({ root: space.root!, contract: space.contract });
+    expect(block).toContain("now — Shipping the local-first pivot this week.");
+  });
+
   it("surfaces operating skills with summaries", async () => {
     await makeAgent(tmp, { "purpose.md": "p" });
     const skillsDir = join(tmp, "_agent", "skills");

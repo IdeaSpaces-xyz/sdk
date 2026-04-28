@@ -142,6 +142,12 @@ describe("extractSummary", () => {
     expect(extractSummary(input)).toBeNull();
   });
 
+  it("finds summary even when it's not the first frontmatter field", () => {
+    const input =
+      "---\nname: Foo\ntags: [a, b]\nattached_to: [person:alice]\nsummary: Found me later.\n---\n# Body";
+    expect(extractSummary(input)).toBe("Found me later.");
+  });
+
   it("strips surrounding double quotes", () => {
     const input = '---\nname: Foo\nsummary: "Quoted summary."\n---\n# Body';
     expect(extractSummary(input)).toBe("Quoted summary.");

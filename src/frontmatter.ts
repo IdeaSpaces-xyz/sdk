@@ -105,6 +105,10 @@ export function extractSummary(content: string): string | null {
   if (!parts.length) return null;
 
   let result = parts.join(" ");
+  // Quotes are only stripped when both boundaries of the joined value match;
+  // a degenerate one-sided case (e.g. `"Part one` joined with `part two"`)
+  // would still match and strip, but that pattern doesn't occur in
+  // well-formed Layer-1 frontmatter so we accept the simple check.
   if ((result.startsWith('"') && result.endsWith('"')) ||
       (result.startsWith("'") && result.endsWith("'"))) {
     result = result.slice(1, -1);

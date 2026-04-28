@@ -70,15 +70,76 @@ describe("assembleAwareness", () => {
     expect(nowMatch![1].length).toBeLessThanOrEqual(51);
   });
 
-  it("lists agent context names in canonical order", async () => {
+  it("lists agent context with summaries in canonical order", async () => {
     await makeAgent(tmp, {
-      "next.md": "x",
-      "foundation.md": "f",
-      "purpose.md": "p",
+      "next.md": "---\nname: Next\nsummary: What's queued.\n---\nBody",
+      "foundation.md": "---\nname: Foundation\nsummary: Baseline contract.\n---\nBody",
+      "purpose.md": "---\nname: Purpose\nsummary: Why this place exists.\n---\nBody",
     });
     const space = await findSpaceRoot(tmp);
     const block = await assembleAwareness({ root: space.root!, contract: space.contract });
-    expect(block).toContain("Agent context: foundation, purpose, next");
+    expect(block).toContain("Agent context:");
+    const lines = block.split("\n");
+    const ctxIdx = lines.findIndex((l) => l === "Agent context:");
+    expect(lines[ctxIdx + 1]).toBe("  foundation — Baseline contract.");
+    expect(lines[ctxIdx + 2]).toBe("  purpose — Why this place exists.");
+    expect(lines[ctxIdx + 3]).toBe("  next — What's queued.");
+  });
+
+  it("falls back to first content line when a contract file lacks frontmatter", async () => {
+    await makeAgent(tmp, {
+      "now.md": "# Now\n\nShipping the local-first pivot this week.",
+    });
+    const space = await findSpaceRoot(tmp);
+    const block = await assembleAwareness({ root: space.root!, contract: space.contract });
+    expect(block).toContain("now — Shipping the local-first pivot this week.");
+  });
+
+  it("surfaces operating skills with summaries", async () => {
+    await makeAgent(tmp, { "purpose.md": "p" });
+    const skillsDir = join(tmp, "_agent", "skills");
+    await fs.mkdir(skillsDir, { recursive: true });
+    await fs.writeFile(
+      join(skillsDir, "commit.md"),
+      "---\nname: Commit\nsummary: Three-tier subject/body/trailers; the body is the agreement.\n---\n# Commit",
+      "utf-8",
+    );
+    await fs.writeFile(
+      join(skillsDir, "review.md"),
+      "# Review\n\nBefore approving, run the smoke tests.",
+      "utf-8",
+    );
+    const space = await findSpaceRoot(tmp);
+    const block = await assembleAwareness({ root: space.root!, contract: space.contract });
+    expect(block).toContain("Operating skills:");
+    expect(block).toContain(
+      "  commit — Three-tier subject/body/trailers; the body is the agreement.",
+    );
+    expect(block).toContain("  review — Before approving, run the smoke tests.");
+  });
+
+  it("omits the operating-skills section when _agent/skills/ is absent or empty", async () => {
+    await makeAgent(tmp, { "purpose.md": "p" });
+    const space = await findSpaceRoot(tmp);
+    const block = await assembleAwareness({ root: space.root!, contract: space.contract });
+    expect(block).not.toContain("Operating skills:");
+  });
+
+  it("truncates long summaries with ellipsis", async () => {
+    const long = "x".repeat(500);
+    await makeAgent(tmp, {
+      "purpose.md": `---\nname: Purpose\nsummary: ${long}\n---\nBody`,
+    });
+    const space = await findSpaceRoot(tmp);
+    const block = await assembleAwareness({
+      root: space.root!,
+      contract: space.contract,
+      summaryExcerptLength: 50,
+    });
+    const purposeMatch = block.match(/  purpose — (.*)$/m);
+    expect(purposeMatch).not.toBeNull();
+    expect(purposeMatch![1].endsWith("…")).toBe(true);
+    expect(purposeMatch![1].length).toBeLessThanOrEqual(51);
   });
 
   it("renders a tree section with directories and top-level markdown files", async () => {

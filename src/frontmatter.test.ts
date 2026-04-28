@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripFrontmatter, composeFrontmatter } from "./frontmatter.js";
+import { stripFrontmatter, composeFrontmatter, extractSummary } from "./frontmatter.js";
 
 describe("stripFrontmatter", () => {
   it("returns body when frontmatter present", () => {
@@ -99,5 +99,61 @@ describe("composeFrontmatter", () => {
     const fm = composeFrontmatter({ name: "Foo", summary: "Bar" });
     const doc = `${fm}# Body\n`;
     expect(stripFrontmatter(doc)).toBe("# Body\n");
+  });
+});
+
+describe("extractSummary", () => {
+  it("returns single-line summary", () => {
+    const input = "---\nname: Foo\nsummary: Short summary.\n---\n# Body";
+    expect(extractSummary(input)).toBe("Short summary.");
+  });
+
+  it("concatenates implicit-continuation multi-line summary", () => {
+    const input =
+      "---\nname: Foundation\nsummary: Baseline contract for an ideaspace —\n  what kind of place this is, how the agent inhabits it,\n  the rhythm of capture and commit.\n---\n# Body";
+    const out = extractSummary(input);
+    expect(out).toBe(
+      "Baseline contract for an ideaspace — what kind of place this is, how the agent inhabits it, the rhythm of capture and commit.",
+    );
+  });
+
+  it("handles folded-scalar (>) form", () => {
+    const input =
+      "---\nname: Foo\nsummary: >\n  Folded line one\n  folded line two\n---\n# Body";
+    expect(extractSummary(input)).toBe("Folded line one folded line two");
+  });
+
+  it("strips surrounding double quotes", () => {
+    const input = '---\nname: Foo\nsummary: "Quoted summary."\n---\n# Body';
+    expect(extractSummary(input)).toBe("Quoted summary.");
+  });
+
+  it("strips surrounding single quotes", () => {
+    const input = "---\nname: Foo\nsummary: 'Quoted summary.'\n---\n# Body";
+    expect(extractSummary(input)).toBe("Quoted summary.");
+  });
+
+  it("returns null when there's no frontmatter", () => {
+    expect(extractSummary("# Just body")).toBeNull();
+  });
+
+  it("returns null when frontmatter has no summary field", () => {
+    const input = "---\nname: Foo\ntags: [a, b]\n---\n# Body";
+    expect(extractSummary(input)).toBeNull();
+  });
+
+  it("returns null when frontmatter is unclosed", () => {
+    expect(extractSummary("---\nsummary: Hanging\n# never closes")).toBeNull();
+  });
+
+  it("stops at the next field, not at the end of frontmatter", () => {
+    const input =
+      "---\nname: Foo\nsummary: First field summary\ntags:\n  - a\n  - b\n---\n# Body";
+    expect(extractSummary(input)).toBe("First field summary");
+  });
+
+  it("handles CRLF line endings", () => {
+    const input = "---\r\nname: Foo\r\nsummary: CRLF summary.\r\n---\r\nBody";
+    expect(extractSummary(input)).toBe("CRLF summary.");
   });
 });

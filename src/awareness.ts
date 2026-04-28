@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import type { SpaceContract } from "./space.js";
-import { stripFrontmatter } from "./frontmatter.js";
+import { stripFrontmatter, extractSummary } from "./frontmatter.js";
 
 export interface AssembleAwarenessOpts {
   /** Absolute path to the space root. */
@@ -15,6 +15,8 @@ export interface AssembleAwarenessOpts {
   maxChanges?: number;
   /** Cap on the Now first-line excerpt. Default: 200 characters. */
   nowExcerptLength?: number;
+  /** Cap on per-summary length when surfacing contract / skill summaries. Default: 200 characters. */
+  summaryExcerptLength?: number;
 }
 
 const SKIP_DIRS = new Set([
@@ -41,19 +43,36 @@ const CONTRACT_ORDER = ["foundation", "guide", "purpose", "now", "next"] as cons
  *     dir2/
  *     file1.md
  *
- *   Agent context: foundation, guide, purpose, now, next
+ *   Agent context:
+ *     foundation — <summary>
+ *     guide — <summary>
+ *     ...
+ *
+ *   Operating skills:
+ *     commit — <summary>
  *
  *   Since last session (M changes):
  *     M  path/changed.md
  *     A  path/added.md
  *     ... and N more
  *
+ * Each contract / skill entry shows its Layer 1 frontmatter summary so the
+ * agent can orient without reading every file. Files without a summary fall
+ * back to the first content line.
+ *
  * No external dependencies. Git changes shell out to the local `git` binary.
  */
 export async function assembleAwareness(
   opts: AssembleAwarenessOpts,
 ): Promise<string> {
-  const { root, contract, lastSha, maxChanges = 15, nowExcerptLength = 200 } = opts;
+  const {
+    root,
+    contract,
+    lastSha,
+    maxChanges = 15,
+    nowExcerptLength = 200,
+    summaryExcerptLength = 200,
+  } = opts;
   const sections: string[] = [];
 
   const nowLine = extractNowLine(contract, nowExcerptLength);
@@ -62,10 +81,11 @@ export async function assembleAwareness(
   const tree = await buildTreeSection(root);
   if (tree) sections.push(tree);
 
-  const agentContext = CONTRACT_ORDER.filter((name) => contract[name]);
-  if (agentContext.length) {
-    sections.push(`Agent context: ${agentContext.join(", ")}`);
-  }
+  const agentContext = buildAgentContextSection(contract, summaryExcerptLength);
+  if (agentContext) sections.push(agentContext);
+
+  const skills = await buildSkillsSection(root, summaryExcerptLength);
+  if (skills) sections.push(skills);
 
   if (lastSha) {
     const changes = await gitChanges(root, lastSha);
@@ -80,6 +100,67 @@ export async function assembleAwareness(
   }
 
   return sections.join("\n\n");
+}
+
+function buildAgentContextSection(
+  contract: SpaceContract,
+  max: number,
+): string | null {
+  const present = CONTRACT_ORDER.filter((name) => contract[name]);
+  if (!present.length) return null;
+  const lines = ["Agent context:"];
+  for (const name of present) {
+    const entry = contract[name]!;
+    const blurb = describeFile(entry.content, max);
+    lines.push(blurb ? `  ${name} — ${blurb}` : `  ${name}`);
+  }
+  return lines.join("\n");
+}
+
+async function buildSkillsSection(root: string, max: number): Promise<string | null> {
+  const skillsDir = join(root, "_agent", "skills");
+  let entries: string[];
+  try {
+    entries = (await fs.readdir(skillsDir))
+      .filter((name) => name.endsWith(".md"))
+      .sort();
+  } catch {
+    return null;
+  }
+  if (!entries.length) return null;
+
+  const lines = ["Operating skills:"];
+  for (const file of entries) {
+    const name = file.replace(/\.md$/, "");
+    let blurb: string | null = null;
+    try {
+      const content = await fs.readFile(join(skillsDir, file), "utf-8");
+      blurb = describeFile(content, max);
+    } catch {
+      // unreadable — fall through with name only
+    }
+    lines.push(blurb ? `  ${name} — ${blurb}` : `  ${name}`);
+  }
+  return lines.join("\n");
+}
+
+function describeFile(content: string, max: number): string | null {
+  const summary = extractSummary(content);
+  if (summary) return truncate(summary, max);
+  // Fallback: first non-blank, non-heading body line.
+  const body = stripFrontmatter(content);
+  for (const raw of body.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("#")) continue;
+    if (line.startsWith(">")) {
+      const stripped = line.replace(/^>+\s*/, "").trim();
+      if (stripped) return truncate(stripped, max);
+      continue;
+    }
+    return truncate(line, max);
+  }
+  return null;
 }
 
 function extractNowLine(contract: SpaceContract, max: number): string | null {

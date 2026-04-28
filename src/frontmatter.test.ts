@@ -129,6 +129,19 @@ describe("extractSummary", () => {
     expect(extractSummary(input)).toBe("Literal line one literal line two");
   });
 
+  it("handles chomp-modifier scalar forms (>-, >+, |-, |+)", () => {
+    for (const indicator of [">-", ">+", "|-", "|+"]) {
+      const input =
+        `---\nname: Foo\nsummary: ${indicator}\n  chomped line one\n  chomped line two\n---\n# Body`;
+      expect(extractSummary(input)).toBe("chomped line one chomped line two");
+    }
+  });
+
+  it("returns null for an empty summary value", () => {
+    const input = "---\nname: Foo\nsummary:\ntags: [a]\n---\n# Body";
+    expect(extractSummary(input)).toBeNull();
+  });
+
   it("strips surrounding double quotes", () => {
     const input = '---\nname: Foo\nsummary: "Quoted summary."\n---\n# Body';
     expect(extractSummary(input)).toBe("Quoted summary.");

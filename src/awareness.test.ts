@@ -144,6 +144,26 @@ describe("assembleAwareness", () => {
     expect(block).not.toContain("Operating skills:");
   });
 
+  it("falls back to name-only when a skill file can't be read", async () => {
+    await makeAgent(tmp, { "purpose.md": "p" });
+    const skillsDir = join(tmp, "_agent", "skills");
+    await fs.mkdir(skillsDir, { recursive: true });
+    // Create a directory whose name ends in .md — readdir picks it up, but
+    // readFile fails with EISDIR. Portable across platforms.
+    await fs.mkdir(join(skillsDir, "broken.md"), { recursive: true });
+    await fs.writeFile(
+      join(skillsDir, "good.md"),
+      "---\nname: Good\nsummary: A working skill.\n---\n# Body",
+      "utf-8",
+    );
+    const space = await findSpaceRoot(tmp);
+    const block = await assembleAwareness({ root: space.root!, contract: space.contract });
+    expect(block).toContain("Operating skills:");
+    expect(block).toContain("  broken"); // name-only, no dash
+    expect(block).not.toMatch(/^ {2}broken — /m);
+    expect(block).toContain("  good — A working skill.");
+  });
+
   it("truncates long summaries with ellipsis", async () => {
     const long = "x".repeat(500);
     await makeAgent(tmp, {

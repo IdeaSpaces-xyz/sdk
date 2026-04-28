@@ -85,7 +85,11 @@ export function extractSummary(content: string): string | null {
 
   const parts: string[] = [];
   const firstLineRaw = lines[summaryStart].slice("summary:".length).trim();
-  if (firstLineRaw && firstLineRaw !== ">" && firstLineRaw !== "|") {
+  // Skip yaml block-scalar indicators on their own line — `>` / `|` plus the
+  // chomp modifiers `>-` / `>+` / `|-` / `|+`. The next-line indented text is
+  // the actual content. (Newline preservation isn't honored — for display we
+  // always join continuations with spaces.)
+  if (firstLineRaw && !/^[>|][+-]?$/.test(firstLineRaw)) {
     parts.push(firstLineRaw);
   }
 

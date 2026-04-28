@@ -46,6 +46,77 @@ export function stripFrontmatter(content: string): string {
 }
 
 /**
+ * Extract the `summary` field from frontmatter.
+ *
+ * Handles three common shapes (Layer 1 use cases):
+ *   summary: short string
+ *   summary: long string that
+ *     continues with implicit indented continuation
+ *   summary: |        # or  >
+ *     literal/folded scalar block
+ *
+ * Returns the summary text (concatenated for multi-line values) or null when
+ * the file has no frontmatter or no summary field. Quoted values have the
+ * surrounding quotes stripped. Doesn't try to handle every yaml edge case —
+ * just the patterns Layer 1 frontmatter actually uses.
+ */
+export function extractSummary(content: string): string | null {
+  if (!content.startsWith(`${DELIM}\n`) && !content.startsWith(`${DELIM}\r\n`)) {
+    return null;
+  }
+  const lines = content.split(/\r?\n/);
+  let endIdx = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trimEnd() === DELIM) {
+      endIdx = i;
+      break;
+    }
+  }
+  if (endIdx === -1) return null;
+
+  let summaryStart = -1;
+  for (let i = 1; i < endIdx; i++) {
+    if (/^summary:/.test(lines[i])) {
+      summaryStart = i;
+      break;
+    }
+  }
+  if (summaryStart === -1) return null;
+
+  const parts: string[] = [];
+  const firstLineRaw = lines[summaryStart].slice("summary:".length).trim();
+  // Skip yaml block-scalar indicators on their own line — `>` / `|` plus the
+  // chomp modifiers `>-` / `>+` / `|-` / `|+`. The next-line indented text is
+  // the actual content. (Newline preservation isn't honored — for display we
+  // always join continuations with spaces.)
+  if (firstLineRaw && !/^[>|][+-]?$/.test(firstLineRaw)) {
+    parts.push(firstLineRaw);
+  }
+
+  for (let i = summaryStart + 1; i < endIdx; i++) {
+    const line = lines[i];
+    if (/^\s+\S/.test(line)) {
+      parts.push(line.trim());
+    } else {
+      break;
+    }
+  }
+
+  if (!parts.length) return null;
+
+  let result = parts.join(" ");
+  // Quotes are only stripped when both boundaries of the joined value match;
+  // a degenerate one-sided case (e.g. `"Part one` joined with `part two"`)
+  // would still match and strip, but that pattern doesn't occur in
+  // well-formed Layer-1 frontmatter so we accept the simple check.
+  if ((result.startsWith('"') && result.endsWith('"')) ||
+      (result.startsWith("'") && result.endsWith("'"))) {
+    result = result.slice(1, -1);
+  }
+  return result || null;
+}
+
+/**
  * Compose a stable yaml frontmatter block.
  *
  * Output is sorted by field order (name, summary, tags, attached_to) and

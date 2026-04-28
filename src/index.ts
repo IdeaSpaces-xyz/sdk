@@ -16,5 +16,9 @@ export type {
 export { assembleAwareness } from "./awareness.js";
 export type { AssembleAwarenessOpts } from "./awareness.js";
 
-export { stripFrontmatter, composeFrontmatter } from "./frontmatter.js";
+export {
+  stripFrontmatter,
+  composeFrontmatter,
+  extractSummary,
+} from "./frontmatter.js";
 export type { Frontmatter } from "./frontmatter.js";

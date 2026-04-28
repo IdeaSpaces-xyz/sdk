@@ -147,17 +147,12 @@ async function buildSkillsSection(root: string, max: number): Promise<string | n
 function describeFile(content: string, max: number): string | null {
   const summary = extractSummary(content);
   if (summary) return truncate(summary, max);
-  // Fallback: first non-blank, non-heading body line.
+  // Fallback: first non-blank, non-heading body line. Layer-1 files should
+  // carry a summary; this fallback is for imperfect or legacy files only.
   const body = stripFrontmatter(content);
   for (const raw of body.split("\n")) {
     const line = raw.trim();
-    if (!line) continue;
-    if (line.startsWith("#")) continue;
-    if (line.startsWith(">")) {
-      const stripped = line.replace(/^>+\s*/, "").trim();
-      if (stripped) return truncate(stripped, max);
-      continue;
-    }
+    if (!line || line.startsWith("#")) continue;
     return truncate(line, max);
   }
   return null;

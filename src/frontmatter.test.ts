@@ -123,6 +123,12 @@ describe("extractSummary", () => {
     expect(extractSummary(input)).toBe("Folded line one folded line two");
   });
 
+  it("handles literal-scalar (|) form — joins lines with spaces for display", () => {
+    const input =
+      "---\nname: Foo\nsummary: |\n  Literal line one\n  literal line two\n---\n# Body";
+    expect(extractSummary(input)).toBe("Literal line one literal line two");
+  });
+
   it("strips surrounding double quotes", () => {
     const input = '---\nname: Foo\nsummary: "Quoted summary."\n---\n# Body';
     expect(extractSummary(input)).toBe("Quoted summary.");

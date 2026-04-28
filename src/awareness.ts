@@ -129,16 +129,22 @@ async function buildSkillsSection(root: string, max: number): Promise<string | n
   }
   if (!entries.length) return null;
 
+  // Parallel reads — matches `readContract` in space.ts.
+  const blurbs = await Promise.all(
+    entries.map(async (file) => {
+      try {
+        const content = await fs.readFile(join(skillsDir, file), "utf-8");
+        return describeFile(content, max);
+      } catch {
+        return null;
+      }
+    }),
+  );
+
   const lines = ["Operating skills:"];
-  for (const file of entries) {
-    const name = file.replace(/\.md$/, "");
-    let blurb: string | null = null;
-    try {
-      const content = await fs.readFile(join(skillsDir, file), "utf-8");
-      blurb = describeFile(content, max);
-    } catch {
-      // unreadable — fall through with name only
-    }
+  for (let i = 0; i < entries.length; i++) {
+    const name = entries[i].replace(/\.md$/, "");
+    const blurb = blurbs[i];
     lines.push(blurb ? `  ${name} — ${blurb}` : `  ${name}`);
   }
   return lines.join("\n");

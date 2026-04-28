@@ -118,8 +118,27 @@ describe("assembleAwareness", () => {
     expect(block).toContain("  review — Before approving, run the smoke tests.");
   });
 
-  it("omits the operating-skills section when _agent/skills/ is absent or empty", async () => {
+  it("omits the operating-skills section when _agent/skills/ is absent", async () => {
     await makeAgent(tmp, { "purpose.md": "p" });
+    const space = await findSpaceRoot(tmp);
+    const block = await assembleAwareness({ root: space.root!, contract: space.contract });
+    expect(block).not.toContain("Operating skills:");
+  });
+
+  it("omits the operating-skills section when _agent/skills/ exists but is empty", async () => {
+    await makeAgent(tmp, { "purpose.md": "p" });
+    await fs.mkdir(join(tmp, "_agent", "skills"), { recursive: true });
+    const space = await findSpaceRoot(tmp);
+    const block = await assembleAwareness({ root: space.root!, contract: space.contract });
+    expect(block).not.toContain("Operating skills:");
+  });
+
+  it("ignores non-md files in _agent/skills/", async () => {
+    await makeAgent(tmp, { "purpose.md": "p" });
+    const skillsDir = join(tmp, "_agent", "skills");
+    await fs.mkdir(skillsDir, { recursive: true });
+    await fs.writeFile(join(skillsDir, "README.txt"), "not markdown", "utf-8");
+    await fs.writeFile(join(skillsDir, ".DS_Store"), "noise", "utf-8");
     const space = await findSpaceRoot(tmp);
     const block = await assembleAwareness({ root: space.root!, contract: space.contract });
     expect(block).not.toContain("Operating skills:");

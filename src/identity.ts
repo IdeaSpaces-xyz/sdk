@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { promises as fs } from "node:fs";
-import { existsSync } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
 
 export const NODE_ID_RE = /^n_[0-9a-f]{12}(?:[0-9a-f]{12})?$/;
@@ -45,6 +44,13 @@ export function inspectMarkdownIdentity(content: string): MarkdownIdentity {
   return { status: "valid", node_id: value };
 }
 
+/**
+ * Ensure a markdown document has a valid `node_id` in frontmatter.
+ *
+ * Missing IDs are inserted. Valid legacy/new IDs are preserved. Malformed IDs
+ * throw unless `regenerate` is true; callers that want non-throwing problem
+ * reporting should call `inspectMarkdownIdentity()` first.
+ */
 export function ensureMarkdownNodeId(content: string, opts: { regenerate?: boolean } = {}): {
   content: string;
   node_id: string;

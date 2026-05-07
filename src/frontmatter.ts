@@ -15,6 +15,7 @@
 
 export interface Frontmatter {
   name?: string;
+  node_id?: string;
   summary?: string;
   tags?: string[];
   attached_to?: string[];
@@ -119,8 +120,8 @@ export function extractSummary(content: string): string | null {
 /**
  * Compose a stable yaml frontmatter block.
  *
- * Output is sorted by field order (name, summary, tags, attached_to) and
- * uses block-style for arrays. Strings are escaped only if they contain
+ * Output is sorted by field order (name, node_id, summary, tags, attached_to)
+ * and uses block-style for arrays. Strings are escaped only if they contain
  * yaml-special characters (colons, quotes, leading dashes); otherwise the
  * raw form is emitted for readability.
  *
@@ -130,6 +131,7 @@ export function extractSummary(content: string): string | null {
 export function composeFrontmatter(fm: Frontmatter): string {
   const lines: string[] = [DELIM];
   if (fm.name !== undefined) lines.push(`name: ${escapeScalar(fm.name)}`);
+  if (fm.node_id !== undefined) lines.push(`node_id: ${escapeScalar(fm.node_id)}`);
   if (fm.summary !== undefined) lines.push(`summary: ${escapeScalar(fm.summary)}`);
   if (fm.tags?.length) lines.push(...renderArray("tags", fm.tags));
   if (fm.attached_to?.length) lines.push(...renderArray("attached_to", fm.attached_to));
@@ -150,6 +152,8 @@ function needsQuoting(value: string): boolean {
   if (/^[\s>|*&!%@`]/.test(value)) return true;
   if (/^[-?]\s/.test(value)) return true;
   if (/[:#]\s/.test(value)) return true;
+  if (/[{}[\],]/.test(value)) return true;
+  if (/[:#]$/.test(value)) return true;
   if (/[\n\r"\\]/.test(value)) return true;
   if (/^(true|false|null|yes|no|on|off|~)$/i.test(value)) return true;
   if (/^-?\d/.test(value)) return true;

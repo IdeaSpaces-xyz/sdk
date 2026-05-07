@@ -44,15 +44,16 @@ describe("composeFrontmatter", () => {
     expect(composeFrontmatter({ name: "Foo" })).toBe("---\nname: Foo\n---\n");
   });
 
-  it("orders fields name, summary, tags, attached_to", () => {
+  it("orders fields name, node_id, summary, tags, attached_to", () => {
     const out = composeFrontmatter({
       attached_to: ["person:alice"],
       tags: ["a"],
       summary: "S",
+      node_id: "n_abcdef123456abcdef123456",
       name: "N",
     });
     expect(out).toBe(
-      "---\nname: N\nsummary: S\ntags:\n  - a\nattached_to:\n  - person:alice\n---\n",
+      "---\nname: N\nnode_id: n_abcdef123456abcdef123456\nsummary: S\ntags:\n  - a\nattached_to:\n  - person:alice\n---\n",
     );
   });
 
@@ -93,6 +94,11 @@ describe("composeFrontmatter", () => {
     expect(composeFrontmatter({ name: "- hyphen-led" })).toContain(
       'name: "- hyphen-led"',
     );
+  });
+
+  it("quotes flow-style and trailing-colon values", () => {
+    expect(composeFrontmatter({ name: "{flow}" })).toContain('name: "{flow}"');
+    expect(composeFrontmatter({ name: "label:" })).toContain('name: "label:"');
   });
 
   it("output is round-trippable through stripFrontmatter", () => {

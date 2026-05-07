@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, promises as fs } from "node:fs";
+import { promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
 
 export const NODE_ID_RE = /^n_[0-9a-f]{12}(?:[0-9a-f]{12})?$/;
@@ -15,7 +15,6 @@ export interface MarkdownIdentity {
 
 interface FrontmatterBlock {
   lines: string[];
-  endIndex: number;
 }
 
 export function generateNodeId(): string {
@@ -110,9 +109,14 @@ export function ensureMarkdownNodeId(content: string, opts: { regenerate?: boole
 
 export async function collectMarkdownFiles(target: string): Promise<string[]> {
   const abs = resolve(target);
-  if (!existsSync(abs)) return [];
 
-  const stat = await fs.lstat(abs);
+  let stat: Awaited<ReturnType<typeof fs.lstat>>;
+  try {
+    stat = await fs.lstat(abs);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
+  }
   if (stat.isSymbolicLink()) return [];
   if (stat.isFile()) return isMarkdownPath(abs) ? [abs] : [];
   if (!stat.isDirectory()) return [];
@@ -147,7 +151,7 @@ function parseFrontmatter(content: string): FrontmatterBlock | null {
   const lines = content.split(/\r?\n/);
   for (let i = 1; i < lines.length; i++) {
     if (lines[i]!.trimEnd() === FRONTMATTER_DELIM) {
-      return { lines: lines.slice(0, i + 1), endIndex: i };
+      return { lines: lines.slice(0, i + 1) };
     }
   }
   return null;

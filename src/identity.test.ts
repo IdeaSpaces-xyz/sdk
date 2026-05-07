@@ -76,6 +76,15 @@ describe("node identity helpers", () => {
     expect(result.content).toMatch(/^---\nnode_id: n_[0-9a-f]{24}\n---\n# Body$/);
   });
 
+  it("regenerates valid node_id when explicit", () => {
+    const oldId = "n_abcdef123456";
+    const result = ensureMarkdownNodeId(`---\nnode_id: ${oldId}\n---\n# Body`, { regenerate: true });
+    expect(result.changed).toBe(true);
+    expect(result.old_node_id).toBe(oldId);
+    expect(result.node_id).toMatch(/^n_[0-9a-f]{24}$/);
+    expect(result.node_id).not.toBe(oldId);
+  });
+
   it("recognizes markdown paths case-insensitively", () => {
     expect(isMarkdownPath("foo.md")).toBe(true);
     expect(isMarkdownPath("foo.MD")).toBe(true);

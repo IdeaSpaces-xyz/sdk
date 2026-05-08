@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripFrontmatter, composeFrontmatter, extractSummary } from "./frontmatter.js";
+import { stripFrontmatter, composeFrontmatter, extractSummary, inspectFrontmatterSyntax } from "./frontmatter.js";
 
 describe("stripFrontmatter", () => {
   it("returns body when frontmatter present", () => {
@@ -96,15 +96,81 @@ describe("composeFrontmatter", () => {
     );
   });
 
-  it("quotes flow-style and trailing-colon values", () => {
+  it("quotes flow-style, trailing-colon, and leading-backtick values", () => {
     expect(composeFrontmatter({ name: "{flow}" })).toContain('name: "{flow}"');
     expect(composeFrontmatter({ name: "label:" })).toContain('name: "label:"');
+    expect(composeFrontmatter({ name: "`ideaspace create` — Adopt and Publish" })).toContain(
+      'name: "`ideaspace create` — Adopt and Publish"',
+    );
   });
 
   it("output is round-trippable through stripFrontmatter", () => {
     const fm = composeFrontmatter({ name: "Foo", summary: "Bar" });
     const doc = `${fm}# Body\n`;
     expect(stripFrontmatter(doc)).toBe("# Body\n");
+  });
+});
+
+describe("inspectFrontmatterSyntax", () => {
+  it("accepts files without frontmatter", () => {
+    expect(inspectFrontmatterSyntax("# Body\n")).toEqual({ status: "none" });
+  });
+
+  it("accepts plain valid frontmatter", () => {
+    expect(inspectFrontmatterSyntax("---\nname: Foo\nsummary: Bar\n---\n# Body")).toEqual({ status: "valid" });
+  });
+
+  it("accepts quoted leading-backtick values", () => {
+    expect(
+      inspectFrontmatterSyntax('---\nname: "`ideaspace create` — Adopt and Publish"\n---\n# Body'),
+    ).toEqual({ status: "valid" });
+  });
+
+  it("accepts CRLF frontmatter", () => {
+    expect(inspectFrontmatterSyntax("---\r\nname: Foo\r\nsummary: Bar\r\n---\r\n# Body")).toEqual({ status: "valid" });
+  });
+
+  it("does not treat embedded dashes as a closing delimiter", () => {
+    expect(inspectFrontmatterSyntax("---\nname: foo---\n---\n# Body")).toEqual({ status: "valid" });
+  });
+
+  it("rejects unquoted leading-backtick values with a content line and column", () => {
+    const result = inspectFrontmatterSyntax(
+      "---\nname: `ideaspace create` — Adopt and Publish\n---\n# Body",
+    );
+    expect(result.status).toBe("malformed");
+    if (result.status === "malformed") {
+      expect(result.message).toContain("reserved character `");
+      expect(result.line).toBe(2);
+      expect(result.column).toBe(7);
+    }
+  });
+
+  it("rejects broken yaml mappings", () => {
+    const result = inspectFrontmatterSyntax("---\n: : invalid: yaml\n---\n# Body");
+    expect(result.status).toBe("malformed");
+  });
+
+  it("accepts an empty frontmatter block", () => {
+    expect(inspectFrontmatterSyntax("---\n---\n# Body")).toEqual({ status: "valid" });
+  });
+
+  it("rejects an unclosed frontmatter block", () => {
+    expect(inspectFrontmatterSyntax("---\nname: Unclosed\n# Body")).toEqual({
+      status: "malformed",
+      message: "frontmatter block is missing closing ---",
+      line: 1,
+      column: 1,
+    });
+  });
+
+  it("rejects a bare opening frontmatter delimiter", () => {
+    expect(inspectFrontmatterSyntax("---\n")).toEqual({
+      status: "malformed",
+      message: "frontmatter block is missing closing ---",
+      line: 1,
+      column: 1,
+    });
   });
 });
 

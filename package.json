@@ -34,5 +34,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/IdeaSpaces-xyz/sdk"
+  },
+  "dependencies": {
+    "yaml": "^2.8.4"
   }
 }

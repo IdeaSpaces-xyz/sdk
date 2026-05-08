@@ -9,9 +9,14 @@
  * yaml block; consumers using replace-semantics (`is_write`, `ideaspaces write`)
  * own all fields they want set.
  *
- * No yaml parser dep — semantic parsing (e.g., merge-semantics on existing
- * tags) is deferred until a use case earns it.
+ * `inspectFrontmatterSyntax` uses a YAML parser for the read/validation path:
+ * files may be hand-edited or written by third-party tools, and reserved
+ * character cases (e.g. unquoted leading backticks) are easy to miss with
+ * regex. Semantic parsing/merge-semantics (e.g., existing tags) is still
+ * deferred until a use case earns it.
  */
+
+import { parseDocument } from "yaml";
 
 export interface Frontmatter {
   name?: string;
@@ -23,6 +28,11 @@ export interface Frontmatter {
 
 const DELIM = "---";
 
+export type FrontmatterSyntax =
+  | { status: "none" }
+  | { status: "valid" }
+  | { status: "malformed"; message: string; line?: number; column?: number };
+
 /**
  * Returns the body of a markdown file with the leading frontmatter block
  * removed. If the input has no frontmatter, returns it unchanged.
@@ -31,19 +41,51 @@ const DELIM = "---";
  * later `---` line. Trailing newline after the closing delimiter is consumed.
  */
 export function stripFrontmatter(content: string): string {
-  if (!content.startsWith(`${DELIM}\n`) && !content.startsWith(`${DELIM}\r\n`)) {
-    return content;
+  const block = frontmatterBlock(content);
+  if (!block) return content;
+  // Body starts after the closing delimiter line. Preserve the previous split
+  // behavior: a trailing newline after the delimiter is consumed naturally by
+  // slicing after that line.
+  return block.lines.slice(block.endLineIndex + 1).join("\n");
+}
+
+/**
+ * Validate a leading YAML frontmatter block.
+ *
+ * Files without frontmatter are valid for this check (`status: "none"`). A
+ * leading `---` without a closing delimiter is treated as malformed because it
+ * will fail on the Python/frontmatter side too. Reported line/column positions
+ * are relative to the full markdown file, not the extracted YAML string.
+ */
+export function inspectFrontmatterSyntax(content: string): FrontmatterSyntax {
+  if (!startsFrontmatter(content)) return { status: "none" };
+
+  const block = frontmatterBlock(content);
+  if (!block) {
+    return {
+      status: "malformed",
+      message: "frontmatter block is missing closing ---",
+      line: 1,
+      column: 1,
+    };
   }
-  const lines = content.split("\n");
-  // lines[0] is the opening "---"
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trimEnd() === DELIM) {
-      // Body starts after the closing delimiter line.
-      return lines.slice(i + 1).join("\n");
-    }
-  }
-  // No closing delimiter — treat as no frontmatter.
-  return content;
+
+  const source = block.lines
+    .slice(1, block.endLineIndex)
+    .map((line) => line.replace(/\r$/, ""))
+    .join("\n");
+  const doc = parseDocument(source);
+  const err = doc.errors[0];
+  if (!err) return { status: "valid" };
+
+  const linePos = err.linePos?.[0];
+  return {
+    status: "malformed",
+    message: err.message,
+    // YAML line 1 is content line 2 because line 1 is the opening delimiter.
+    line: linePos ? linePos.line + 1 : undefined,
+    column: linePos?.col,
+  };
 }
 
 /**
@@ -162,4 +204,19 @@ function needsQuoting(value: string): boolean {
 
 function renderArray(key: string, items: string[]): string[] {
   return [`${key}:`, ...items.map((v) => `  - ${escapeScalar(v)}`)];
+}
+
+function startsFrontmatter(content: string): boolean {
+  return content.startsWith(`${DELIM}\n`) || content.startsWith(`${DELIM}\r\n`);
+}
+
+function frontmatterBlock(content: string): { lines: string[]; endLineIndex: number } | null {
+  if (!startsFrontmatter(content)) return null;
+  const lines = content.split("\n");
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i]!.trimEnd() === DELIM) {
+      return { lines, endLineIndex: i };
+    }
+  }
+  return null;
 }

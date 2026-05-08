@@ -20,8 +20,9 @@ export {
   stripFrontmatter,
   composeFrontmatter,
   extractSummary,
+  inspectFrontmatterSyntax,
 } from "./frontmatter.js";
-export type { Frontmatter } from "./frontmatter.js";
+export type { Frontmatter, FrontmatterSyntax } from "./frontmatter.js";
 
 export {
   NODE_ID_RE,

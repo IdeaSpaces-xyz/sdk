@@ -24,13 +24,3 @@ export {
 } from "./frontmatter.js";
 export type { Frontmatter, FrontmatterSyntax } from "./frontmatter.js";
 
-export {
-  NODE_ID_RE,
-  generateNodeId,
-  isNodeId,
-  inspectMarkdownIdentity,
-  ensureMarkdownNodeId,
-  collectMarkdownFiles,
-  isMarkdownPath,
-} from "./identity.js";
-export type { MarkdownIdentity } from "./identity.js";

@@ -49,10 +49,16 @@ export type {
 export { sessionState } from "./session-state.js";
 export type { SessionState, SessionStore } from "./session-state.js";
 
+// Skill catalog — the distribution-canonical reference content (8 universal
+// skills), consumed by the plugin build and the MCP server's resource serving.
+export { listSkills, readSkill } from "./skills.js";
+export type { SkillInfo, Skill } from "./skills.js";
+
 export {
   stripFrontmatter,
   composeFrontmatter,
   extractSummary,
+  extractDescription,
   inspectFrontmatterSyntax,
 } from "./frontmatter.js";
 export type { Frontmatter, FrontmatterSyntax } from "./frontmatter.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripFrontmatter, composeFrontmatter, extractSummary, inspectFrontmatterSyntax } from "./frontmatter.js";
+import { stripFrontmatter, composeFrontmatter, extractSummary, extractDescription, inspectFrontmatterSyntax } from "./frontmatter.js";
 
 describe("stripFrontmatter", () => {
   it("returns body when frontmatter present", () => {
@@ -252,5 +252,31 @@ describe("extractSummary", () => {
   it("handles CRLF line endings", () => {
     const input = "---\r\nname: Foo\r\nsummary: CRLF summary.\r\n---\r\nBody";
     expect(extractSummary(input)).toBe("CRLF summary.");
+  });
+});
+
+describe("extractDescription", () => {
+  it("reads the description field", () => {
+    const input = "---\nname: skill\ndescription: When to use this skill.\n---\nBody";
+    expect(extractDescription(input)).toBe("When to use this skill.");
+  });
+
+  it("reads a folded description block", () => {
+    const input = "---\nname: skill\ndescription: >\n  line one\n  line two\n---\nBody";
+    expect(extractDescription(input)).toBe("line one line two");
+  });
+
+  it("falls back to summary when description is absent", () => {
+    const input = "---\nname: note\nsummary: A note summary.\n---\nBody";
+    expect(extractDescription(input)).toBe("A note summary.");
+  });
+
+  it("prefers description over summary when both are present", () => {
+    const input = "---\ndescription: the trigger\nsummary: the blurb\n---\nBody";
+    expect(extractDescription(input)).toBe("the trigger");
+  });
+
+  it("returns null when neither field exists", () => {
+    expect(extractDescription("---\nname: x\n---\nBody")).toBeNull();
   });
 });

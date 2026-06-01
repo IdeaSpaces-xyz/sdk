@@ -22,6 +22,8 @@ export interface Frontmatter {
   name?: string;
   node_id?: string;
   summary?: string;
+  /** Skill trigger hint (SDK skill catalog). Notes use `summary` instead. */
+  description?: string;
   tags?: string[];
   attached_to?: string[];
 }
@@ -104,6 +106,22 @@ export function inspectFrontmatterSyntax(content: string): FrontmatterSyntax {
  * just the patterns Layer 1 frontmatter actually uses.
  */
 export function extractSummary(content: string): string | null {
+  return extractScalarField(content, "summary");
+}
+
+/**
+ * Extract the `description` field, falling back to `summary`.
+ *
+ * Skill frontmatter (the SDK skill catalog) uses `description` as the agent's
+ * trigger hint; the writing standard's Notes use `summary`. Surfacing skill
+ * blurbs needs to read either — prefer `description`, fall back to `summary`.
+ */
+export function extractDescription(content: string): string | null {
+  return extractScalarField(content, "description") ?? extractScalarField(content, "summary");
+}
+
+/** Read a single scalar frontmatter field, handling folded/literal blocks. */
+function extractScalarField(content: string, field: string): string | null {
   if (!content.startsWith(`${DELIM}\n`) && !content.startsWith(`${DELIM}\r\n`)) {
     return null;
   }
@@ -117,9 +135,10 @@ export function extractSummary(content: string): string | null {
   }
   if (endIdx === -1) return null;
 
+  const prefix = `${field}:`;
   let summaryStart = -1;
   for (let i = 1; i < endIdx; i++) {
-    if (/^summary:/.test(lines[i])) {
+    if (lines[i].startsWith(prefix)) {
       summaryStart = i;
       break;
     }
@@ -127,7 +146,7 @@ export function extractSummary(content: string): string | null {
   if (summaryStart === -1) return null;
 
   const parts: string[] = [];
-  const firstLineRaw = lines[summaryStart].slice("summary:".length).trim();
+  const firstLineRaw = lines[summaryStart].slice(prefix.length).trim();
   // Skip yaml block-scalar indicators on their own line — `>` / `|` plus the
   // chomp modifiers `>-` / `>+` / `|-` / `|+`. The next-line indented text is
   // the actual content. (Newline preservation isn't honored — for display we

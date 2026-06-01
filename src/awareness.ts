@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
-import { spawn } from "node:child_process";
 import { join } from "node:path";
 import type { SpaceContract } from "./space.js";
 import { stripFrontmatter, extractSummary } from "./frontmatter.js";
+import { recentActivity } from "./git.js";
 
 export interface AssembleAwarenessOpts {
   /** Absolute path to the space root. */
@@ -88,12 +88,12 @@ export async function assembleAwareness(
   if (skills) sections.push(skills);
 
   if (lastSha) {
-    const changes = await gitChanges(root, lastSha);
-    if (changes.length) {
-      const total = changes.length;
-      const head = changes.slice(0, maxChanges);
+    const { changedFiles } = await recentActivity(root, lastSha);
+    if (changedFiles.length) {
+      const total = changedFiles.length;
+      const head = changedFiles.slice(0, maxChanges);
       const lines = [`Since last session (${total} changes):`];
-      for (const c of head) lines.push(`  ${c}`);
+      for (const c of head) lines.push(`  ${c.status}\t${c.path}`);
       if (total > maxChanges) lines.push(`  ... and ${total - maxChanges} more`);
       sections.push(lines.join("\n"));
     }
@@ -237,25 +237,4 @@ async function countMarkdown(dir: string): Promise<number> {
     }
   }
   return count;
-}
-
-async function gitChanges(root: string, since: string): Promise<string[]> {
-  return new Promise((resolve) => {
-    const proc = spawn(
-      "git",
-      ["-C", root, "diff", "--name-status", `${since}..HEAD`],
-      { stdio: ["ignore", "pipe", "pipe"] },
-    );
-    let out = "";
-    proc.stdout.on("data", (d: Buffer) => (out += d));
-    proc.on("close", (code) => {
-      if (code !== 0) return resolve([]);
-      const lines = out
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean);
-      resolve(lines);
-    });
-    proc.on("error", () => resolve([]));
-  });
 }

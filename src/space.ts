@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-const CONTRACT_FILES = [
+export const CONTRACT_FILES = [
   "foundation",
   "guide",
   "purpose",
@@ -30,13 +30,18 @@ export interface SpaceRoot {
 }
 
 /**
- * Walk up from `cwd` looking for an `_agent/` folder. Returns the first ancestor
- * (including cwd itself) that has one, plus the parsed five-file contract.
+ * Walk up from `cwd` and return the **nearest** `_agent/` folder — the current
+ * branch the caller sits in — plus its parsed five-file contract.
+ *
+ * Note: "nearest `_agent/`" is *not* the same as the space root. The space root
+ * is the level carrying `foundation.md`, which may be several levels up. For the
+ * full root → cwd picture (and to distinguish the two), use `walkPathContext`;
+ * this is the cheap nearest-branch lookup for callers that only need that.
  *
  * Stops at the filesystem root. Files in `_agent/` outside the five-file
  * contract are ignored — the caller can read them directly via `root` if needed.
  */
-export async function findSpaceRoot(cwd: string): Promise<SpaceRoot> {
+export async function findNearestAgent(cwd: string): Promise<SpaceRoot> {
   let dir = resolve(cwd);
 
   while (true) {
@@ -62,7 +67,15 @@ async function isDirectory(path: string): Promise<boolean> {
   }
 }
 
-async function readContract(agentDir: string): Promise<SpaceContract> {
+/**
+ * @deprecated Misleading name — this returns the *nearest* `_agent/`, not the
+ * space root. Use `findNearestAgent` (or `walkPathContext` for the full walk).
+ * Kept as an alias for existing callers.
+ */
+export const findSpaceRoot = findNearestAgent;
+
+/** Read the five-file `_agent/` contract from an `_agent/` directory. */
+export async function readContract(agentDir: string): Promise<SpaceContract> {
   const entries: SpaceContract = {};
   await Promise.all(
     CONTRACT_FILES.map(async (name) => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { promises as fs } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -12,7 +13,9 @@ import {
 let tmp: string;
 
 beforeEach(async () => {
-  tmp = await mkdtemp(join(tmpdir(), "is-sdk-pathctx-"));
+  // realpathSync resolves macOS /tmp → /private/tmp, matching the other
+  // fixtures and keeping any future absPath assertions honest.
+  tmp = realpathSync(await mkdtemp(join(tmpdir(), "is-sdk-pathctx-")));
 });
 
 afterEach(async () => {

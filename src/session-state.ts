@@ -59,8 +59,11 @@ export function sessionState(repoRoot: string): SessionStore {
   async function load(): Promise<SessionState | null> {
     try {
       const parsed = JSON.parse(await fs.readFile(file, "utf-8")) as SessionState;
-      // Defensive: an externally-mangled file shouldn't crash the session.
+      // Defensive: a hand-edited or truncated file shouldn't crash the session
+      // or violate the typed shape.
       if (!Array.isArray(parsed.staged_paths)) parsed.staged_paths = [];
+      if (!parsed.session_id) parsed.session_id = randomUUID();
+      if (!parsed.started_at) parsed.started_at = new Date().toISOString();
       return parsed;
     } catch {
       return null;

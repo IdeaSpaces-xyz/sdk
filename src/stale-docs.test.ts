@@ -119,6 +119,31 @@ describe("staleDocSignals", () => {
     });
   });
 
+  it("emits both broken and stale for a doc with mixed code paths", async () => {
+    if (!hasGit()) return;
+    await initRepo();
+    await write("doc.md", docWithDeps(["src/keep.ts", "src/gone.ts"]));
+    await write("src/keep.ts", "v1");
+    await write("src/gone.ts", "v1");
+    git(tmp, ["add", "."]);
+    git(tmp, ["commit", "-q", "-m", "doc + both"], "2026-01-01T00:00:00");
+
+    // keep.ts moves ahead of the doc; gone.ts is deleted.
+    await write("src/keep.ts", "v2");
+    git(tmp, ["rm", "-q", "src/gone.ts"]);
+    git(tmp, ["add", "src/keep.ts"]);
+    git(tmp, ["commit", "-q", "-m", "update + delete"], "2026-02-01T00:00:00");
+
+    const deps = await collectDocDependencies(tmp, ".");
+    const signals = await staleDocSignals(tmp, deps);
+    expect(signals).toHaveLength(2);
+
+    const broken = signals.find((s) => s.kind === "broken");
+    const stale = signals.find((s) => s.kind === "stale");
+    expect(broken).toMatchObject({ doc: "doc.md", missing: ["src/gone.ts"] });
+    expect(stale).toMatchObject({ doc: "doc.md", newestCode: "src/keep.ts" });
+  });
+
   it("skips an existing-but-untracked code path without flagging stale or broken", async () => {
     if (!hasGit()) return;
     await initRepo();

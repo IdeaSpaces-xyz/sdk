@@ -66,6 +66,18 @@ describe("gitState", () => {
     expect(state.repoRoot).toBe(tmp);
   });
 
+  it("reports a null branch in detached HEAD", async () => {
+    if (!hasGit()) return;
+    await initRepo(tmp);
+    await fs.writeFile(join(tmp, "README.md"), "v1", "utf-8");
+    git(tmp, ["add", "."]);
+    git(tmp, ["commit", "-q", "-m", "first"]);
+    git(tmp, ["checkout", "-q", "--detach"]);
+
+    const state = await gitState(tmp);
+    expect(state.branch).toBeNull();
+  });
+
   it("flags dirty on a tracked modification", async () => {
     if (!hasGit()) return;
     await initRepo(tmp);

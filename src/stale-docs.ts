@@ -117,6 +117,9 @@ export async function staleDocSignals(
   const root = resolve(repoRoot);
   const signals: DriftSignal[] = [];
 
+  // Sequential by design: git lookups run one at a time. Session-start drift
+  // checks aren't latency-critical and the doc set is small (status-bearing
+  // docs only), so we trade a little wall-clock for fewer concurrent spawns.
   for (const { path, codePaths } of docs) {
     // Broken references are independent of doc commit history — a doc pointing
     // at vanished code is drift even if the doc itself is uncommitted.

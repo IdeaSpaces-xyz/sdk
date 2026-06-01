@@ -26,7 +26,7 @@ import { stripFrontmatter, extractSummary } from "./frontmatter.js";
  */
 
 export interface PathLevel {
-  /** Path relative to `repoRoot`; `""` for the root level. */
+  /** Path relative to `repoRoot`, always forward-slash separated; `""` at root. */
   path: string;
   /** Absolute path to this level's directory. */
   absPath: string;
@@ -88,6 +88,8 @@ export async function walkPathContext(
       : rel.split(sep).filter(Boolean);
 
   // Accumulate the ordered directory list: root, root/seg1, root/seg1/seg2, …
+  // relPath stays forward-slash separated (segments came from splitting on the
+  // platform `sep`); `join(root, relPath)` re-platforms it for filesystem reads.
   const relPaths: string[] = [""];
   let acc = "";
   for (const segment of segments) {

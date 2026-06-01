@@ -16,9 +16,11 @@
     "skills"
   ],
   "scripts": {
-    "prepare": "tsc",
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "embed-skills": "node scripts/embed-skills.mjs",
+    "prepare": "npm run embed-skills && tsc",
+    "build": "npm run embed-skills && tsc",
+    "dev": "npm run embed-skills && tsc --watch",
+    "pretest": "npm run embed-skills",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist"

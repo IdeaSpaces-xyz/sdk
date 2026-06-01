@@ -1,19 +1,17 @@
-import { promises as fs } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { join } from "node:path";
 import { extractDescription } from "./frontmatter.js";
+import { SKILL_CATALOG } from "./skill-catalog.generated.js";
 
 /**
  * The SDK skill catalog — the distribution-canonical reference content.
  *
- * The 8 universal skills ship as markdown under the package's `skills/`
- * directory (see `package.json` `files`). The plugin build copies them into
- * its `reference/`; the MCP server serves them as resources. Both consume
- * through `listSkills` / `readSkill` rather than reaching into the files.
+ * Content is **compiled in** (see `scripts/embed-skills.mjs`, which bakes
+ * `skills/*.md` into `skill-catalog.generated.ts`), so `listSkills`/`readSkill`
+ * work identically whether the SDK is read from `node_modules` or bundled into
+ * a consumer (the MCP server, any esbuild'd tool). No filesystem, no
+ * `import.meta.url` path resolution — bundling can't break it.
  *
- * A skill's identity is its file stem (`awareness.md` → `awareness`), which is
- * what `readSkill` takes. The blurb comes from `description` frontmatter,
- * falling back to `summary`.
+ * A skill's identity is its file stem (`awareness.md` → `awareness`). The blurb
+ * comes from `description` frontmatter, falling back to `summary`.
  */
 
 export interface SkillInfo {
@@ -28,41 +26,20 @@ export interface Skill extends SkillInfo {
   content: string;
 }
 
-// Resolves to the package's `skills/` dir from both `dist/` (built) and
-// `src/` (tests) — both sit one level under the package root.
-const SKILLS_DIR = fileURLToPath(new URL("../skills/", import.meta.url));
-
 /** List the catalog: every skill's id + blurb, sorted by id. */
 export async function listSkills(): Promise<SkillInfo[]> {
-  let files: string[];
-  try {
-    files = await fs.readdir(SKILLS_DIR);
-  } catch {
-    return [];
-  }
-  const skills = await Promise.all(
-    files
-      .filter((f) => f.endsWith(".md"))
-      .sort()
-      .map(async (f) => {
-        const content = await fs.readFile(join(SKILLS_DIR, f), "utf-8");
-        return { name: f.replace(/\.md$/, ""), description: extractDescription(content) };
-      }),
-  );
-  return skills;
+  return Object.keys(SKILL_CATALOG)
+    .sort()
+    .map((name) => ({ name, description: extractDescription(SKILL_CATALOG[name]) }));
 }
 
 /** Read one skill by id. Throws if the skill doesn't exist. */
 export async function readSkill(name: string): Promise<Skill> {
-  // Guard against path traversal — a skill id is a bare stem.
+  // Guard kept for callers that pass arbitrary ids (e.g. MCP resource reads).
   if (name.includes("/") || name.includes("\\") || name.includes("..")) {
     throw new Error(`Invalid skill name: ${name}`);
   }
-  let content: string;
-  try {
-    content = await fs.readFile(join(SKILLS_DIR, `${name}.md`), "utf-8");
-  } catch {
-    throw new Error(`Unknown skill: ${name}`);
-  }
+  const content = SKILL_CATALOG[name];
+  if (content === undefined) throw new Error(`Unknown skill: ${name}`);
   return { name, description: extractDescription(content), content };
 }

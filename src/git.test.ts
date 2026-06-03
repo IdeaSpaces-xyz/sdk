@@ -44,8 +44,10 @@ describe("gitState", () => {
     git(tmp, ["add", "."]);
     git(tmp, ["commit", "-q", "-m", "first"]);
 
+    const head = git(tmp, ["rev-parse", "HEAD"]).trim();
     const state = await gitState(tmp);
     expect(state.repoRoot).toBe(tmp);
+    expect(state.headSha).toBe(head);
     expect(state.branch).toBe("main");
     expect(state.ahead).toBeNull();
     expect(state.behind).toBeNull();
@@ -106,6 +108,15 @@ describe("gitState", () => {
     expect(state.untrackedInTrackedDirs).toContain("note.md");
     expect(state.untrackedInTrackedDirs.some((p) => p.startsWith("fresh"))).toBe(false);
     expect(state.dirty).toBe(false); // untracked-only is not "dirty"
+  });
+
+  it("reports null headSha for an unborn repo", async () => {
+    if (!hasGit()) return;
+    await initRepo(tmp);
+
+    const state = await gitState(tmp);
+    expect(state.headSha).toBeNull();
+    expect(state.branch).toBeNull();
   });
 });
 

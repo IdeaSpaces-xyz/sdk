@@ -19,6 +19,8 @@ const DEFAULT_COMMIT_LIMIT = 20;
 export interface GitState {
   /** Absolute path to the git toplevel — the canonical repo root. */
   repoRoot: string;
+  /** Current HEAD commit SHA, or `null` when the repo has no commits. */
+  headSha: string | null;
   /** Current branch name, or `null` in detached HEAD. */
   branch: string | null;
   /** Commits ahead of upstream, or `null` when there is no upstream. */
@@ -98,6 +100,9 @@ export async function gitState(repoRoot: string): Promise<GitState> {
   const top = await runGit(repoRoot, ["rev-parse", "--show-toplevel"]);
   const root = top.ok ? top.out.trim() : repoRoot;
 
+  const headRes = await runGit(root, ["rev-parse", "--verify", "HEAD"]);
+  const headSha = headRes.ok ? headRes.out.trim() || null : null;
+
   const branchRes = await runGit(root, ["rev-parse", "--abbrev-ref", "HEAD"]);
   const branchRaw = branchRes.ok ? branchRes.out.trim() : "";
   const branch = !branchRaw || branchRaw === "HEAD" ? null : branchRaw;
@@ -143,7 +148,7 @@ export async function gitState(repoRoot: string): Promise<GitState> {
     }
   }
 
-  return { repoRoot: root, branch, ahead, behind, dirty, untrackedInTrackedDirs };
+  return { repoRoot: root, headSha, branch, ahead, behind, dirty, untrackedInTrackedDirs };
 }
 
 /**

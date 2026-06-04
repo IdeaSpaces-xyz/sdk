@@ -20,7 +20,6 @@ import { parseDocument } from "yaml";
 
 export interface Frontmatter {
   name?: string;
-  node_id?: string;
   summary?: string;
   /** Skill trigger hint (SDK skill catalog). Notes use `summary` instead. */
   description?: string;
@@ -181,7 +180,7 @@ function extractScalarField(content: string, field: string): string | null {
 /**
  * Compose a stable yaml frontmatter block.
  *
- * Output is sorted by field order (name, node_id, summary, tags, attached_to)
+ * Output is sorted by field order (name, summary, tags, attached_to)
  * and uses block-style for arrays. Strings are escaped only if they contain
  * yaml-special characters (colons, quotes, leading dashes); otherwise the
  * raw form is emitted for readability.
@@ -192,7 +191,6 @@ function extractScalarField(content: string, field: string): string | null {
 export function composeFrontmatter(fm: Frontmatter): string {
   const lines: string[] = [DELIM];
   if (fm.name !== undefined) lines.push(`name: ${escapeScalar(fm.name)}`);
-  if (fm.node_id !== undefined) lines.push(`node_id: ${escapeScalar(fm.node_id)}`);
   if (fm.summary !== undefined) lines.push(`summary: ${escapeScalar(fm.summary)}`);
   if (fm.tags?.length) lines.push(...renderArray("tags", fm.tags));
   if (fm.attached_to?.length) lines.push(...renderArray("attached_to", fm.attached_to));

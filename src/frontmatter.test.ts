@@ -44,16 +44,15 @@ describe("composeFrontmatter", () => {
     expect(composeFrontmatter({ name: "Foo" })).toBe("---\nname: Foo\n---\n");
   });
 
-  it("orders fields name, node_id, summary, tags, attached_to", () => {
+  it("orders fields name, summary, tags, attached_to", () => {
     const out = composeFrontmatter({
       attached_to: ["person:alice"],
       tags: ["a"],
       summary: "S",
-      node_id: "n_abcdef123456abcdef123456",
       name: "N",
     });
     expect(out).toBe(
-      "---\nname: N\nnode_id: n_abcdef123456abcdef123456\nsummary: S\ntags:\n  - a\nattached_to:\n  - person:alice\n---\n",
+      "---\nname: N\nsummary: S\ntags:\n  - a\nattached_to:\n  - person:alice\n---\n",
     );
   });
 

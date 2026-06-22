@@ -23,6 +23,11 @@ jobs:
           node-version: "22"
           cache: "npm"
 
+      # @ideaspaces/protocol is a public git dependency; package-lock may pin it
+      # as git+ssh, and the CI runner has no SSH key. Rewrite to anonymous HTTPS.
+      - name: Force HTTPS for GitHub git fetch
+        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+
       - name: Install dependencies
         run: npm ci
 

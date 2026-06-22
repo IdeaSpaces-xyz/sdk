@@ -1,7 +1,7 @@
 {
   "name": "@ideaspaces/sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for IdeaSpaces — the standardized layer between agents and the knowledge space",
+  "description": "TypeScript SDK for IdeaSpaces — the platform layer over @ideaspaces/protocol",
   "type": "module",
   "exports": {
     ".": {
@@ -12,15 +12,12 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "skills"
+    "dist"
   ],
   "scripts": {
-    "embed-skills": "node scripts/embed-skills.mjs",
-    "prepare": "npm run embed-skills && tsc",
-    "build": "npm run embed-skills && tsc",
-    "dev": "npm run embed-skills && tsc --watch",
-    "pretest": "npm run embed-skills",
+    "prepare": "tsc",
+    "build": "tsc",
+    "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist"
@@ -39,6 +36,6 @@
     "url": "https://github.com/IdeaSpaces-xyz/sdk"
   },
   "dependencies": {
-    "yaml": "^2.8.4"
+    "@ideaspaces/protocol": "github:IdeaSpaces-xyz/ideaspace-protocol"
   }
 }

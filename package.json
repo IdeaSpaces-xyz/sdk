@@ -36,6 +36,6 @@
     "url": "https://github.com/IdeaSpaces-xyz/sdk"
   },
   "dependencies": {
-    "@ideaspaces/protocol": "github:IdeaSpaces-xyz/ideaspace-protocol"
+    "@ideaspaces/protocol": "github:IdeaSpaces-xyz/ideaspace-protocol#v0.1.0"
   }
 }

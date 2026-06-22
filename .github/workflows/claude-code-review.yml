@@ -32,10 +32,10 @@ jobs:
             Review this pull request using our SLC (Simple, Lovable, Complete) principles for the IdeaSpaces SDK.
 
             ## Context
-            - This repo: TypeScript ESM library (`@ideaspaces/sdk`). Local-first primitives (`findSpaceRoot`, `assembleAwareness`, `stripFrontmatter`, `composeFrontmatter`) plus a frozen-for-revival type contract from the legacy server-bound surface (`types.ts`).
-            - Stable contract: types in `types.ts` are intentionally preserved for the future sync surface; new local types co-locate with their modules.
-            - No runtime deps; ESM-only output via `tsc`. Tests via vitest.
-            - Reference: monorepo CLAUDE.md (root principles), ideaspace/architecture/plans/plugin-local-first/scope-review.md (the build-sweep design).
+            - This repo: `@ideaspaces/sdk` — the **platform layer**. The shape primitives now live in `@ideaspaces/protocol`; SDK re-exports them (`export * from "@ideaspaces/protocol"`) so existing consumers are unchanged, and is where platform code (sync, auth, API client) will be added over time.
+            - Today SDK is essentially `src/index.ts` (the re-export) + `src/index.test.ts` (a full-surface guard asserting every re-exported symbol resolves). Shape logic and its review belong in the protocol repo, not here.
+            - One runtime dep: `@ideaspaces/protocol`, pinned to a tag. ESM-only via `tsc`; tests via vitest.
+            - Reference: monorepo CLAUDE.md (root principles); `@ideaspaces/protocol` for the shape itself.
 
             ## SLC label context
             - `slc:simple` / `slc:lovable` / `slc:complete`: quick validation for labeled dimensions, deeper review for unlabeled.
@@ -51,29 +51,27 @@ jobs:
             - Any unnecessary new abstractions?
 
             ### Lovable ❤️
-            - Public API ergonomics: clear types, predictable defaults, error paths fail safely.
-            - Replace-semantics for `composeFrontmatter`: caller owns all fields they want set.
-            - Graceful degradation: filesystem absences and external-tool failures (git, etc.) handled silently when appropriate.
-            - Consumer experience: cli, mcp-server, plugin's hook should compose primitives without ceremony.
+            - Consumers (cli, mcp-server, the plugin) import from `@ideaspaces/sdk` without ceremony; the re-export keeps that surface stable.
+            - Platform additions, when they come: clear types, predictable defaults, error paths fail safely.
+            - The re-export stays complete — if the protocol surface grows, consumers can reach it through the SDK.
 
             ### Complete 🏁
             - Tests cover happy paths AND edge cases (vitest with tmpdir fixtures preferred for fs-touching primitives)?
-            - No leftover server-bound dead code, transport stubs, or unused imports.
+            - No shape logic re-implemented here (it belongs in `@ideaspaces/protocol`); no unused imports or dead code.
             - `tsc --noEmit` clean; `npm test` passes; `npm run build` produces ESM in `dist/`.
             - Type exports (re-exports in `index.ts`) cover what consumers actually need.
 
             ## SDK-specific checks
-            - **Stable contract preservation.** Don't modify legacy types in `types.ts` without a clear reason; new local types co-locate with their module.
-            - **No filesystem writes from read-style primitives.** `findSpaceRoot`, `assembleAwareness`, `stripFrontmatter` are read-only.
-            - **Functional API preferred** over stateful classes unless lifecycle truly demands one.
-            - **Cross-platform paths** via `node:path` (no string concatenation with `/`).
-            - **Async by default** for any I/O.
+            - **Stay a thin re-export.** Shape primitives (frontmatter, `_agent/` contract, awareness, git, drift) live in `@ideaspaces/protocol`. Don't re-implement or fork them here.
+            - **Keep the re-export complete.** The full-surface guard test (`src/index.test.ts`) must assert every symbol consumers rely on; a protocol rename/drop should fail SDK CI loudly, not silently break consumers.
+            - **Protocol dep stays pinned** to a tag; bump deliberately.
+            - **Platform code, when added,** is the only thing that belongs here (sync/auth/API client) — functional API, async I/O, cross-platform paths via `node:path`.
 
             ## Anti-pattern detection 🚨
-            - Reintroducing server-bound code (the strip is intentional; sync revival is a future, separate effort).
-            - Speculative API surface that no consumer needs yet.
-            - Adding deps without earning them (the sdk has zero runtime deps; stdlib + Node primitives first).
-            - Test fixtures that depend on the project's own ideaspace tree (use tmpdir).
+            - Re-implementing or forking shape logic that belongs in `@ideaspaces/protocol`.
+            - Speculative platform API no consumer needs yet.
+            - Adding runtime deps without earning them (SDK's only runtime dep is `@ideaspaces/protocol`; stdlib + Node primitives first).
+            - Letting the re-export drift from the protocol's actual surface.
 
             ## Output format
 

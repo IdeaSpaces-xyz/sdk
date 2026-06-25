@@ -10,6 +10,7 @@ const EXPECTED_FUNCTIONS = [
   "findNearestAgent",
   "findSpaceRoot",
   "readContract",
+  "composeContractAlongPath",
   // awareness
   "assembleAwareness",
   // git state

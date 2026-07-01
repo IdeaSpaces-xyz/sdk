@@ -33,6 +33,15 @@ const EXPECTED_FUNCTIONS = [
   "extractSummary",
   "extractDescription",
   "inspectFrontmatterSyntax",
+  // change-layer commit trailers
+  "isValidChangeId",
+  "slugify",
+  "formatChangeId",
+  "mintChangeId",
+  "changeIdGrep",
+  "parseTrailers",
+  "buildTrailers",
+  "appendTrailers",
 ] as const;
 
 describe("@ideaspaces/sdk re-export of @ideaspaces/protocol", () => {
@@ -45,5 +54,10 @@ describe("@ideaspaces/sdk re-export of @ideaspaces/protocol", () => {
     expect(sdk.CONTRACT_FILES).toEqual(
       expect.arrayContaining(["foundation", "guide", "purpose", "now", "next"]),
     );
+  });
+
+  it("re-exports CHANGE_ID_PATTERN as a RegExp", () => {
+    expect(sdk.CHANGE_ID_PATTERN).toBeInstanceOf(RegExp);
+    expect(sdk.CHANGE_ID_PATTERN.test("chg_token-bucket-a3f9")).toBe(true);
   });
 });

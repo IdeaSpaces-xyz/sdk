@@ -5,3 +5,7 @@
 // importing from @ideaspaces/sdk unchanged. Platform code (sync, auth, API
 // client) will be added here over time, on top of the protocol.
 export * from "@ideaspaces/protocol";
+
+// Platform layer — the Keeper transport contract + the pi→Keeper bridge.
+export * from "./keeper-events.js";
+export * from "./agent-to-keeper.js";

@@ -7,6 +7,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./tool-contract": {
+      "import": "./dist/tool-contract.js",
+      "types": "./dist/tool-contract.d.ts"
     }
   },
   "main": "./dist/index.js",

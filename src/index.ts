@@ -9,3 +9,6 @@ export * from "@ideaspaces/protocol";
 // Platform layer — the Keeper transport contract + the pi→Keeper bridge.
 export * from "./keeper-events.js";
 export * from "./agent-to-keeper.js";
+
+// Agent connector contract — common semantic surface across MCP and Pi.
+export * from "./tool-contract.js";

@@ -32,10 +32,11 @@ jobs:
             Review this pull request using our SLC (Simple, Lovable, Complete) principles for the IdeaSpaces SDK.
 
             ## Context
-            - This repo: `@ideaspaces/sdk` — the **platform layer**. The shape primitives now live in `@ideaspaces/protocol`; SDK re-exports them (`export * from "@ideaspaces/protocol"`) so existing consumers are unchanged, and is where platform code (sync, auth, API client) will be added over time.
-            - Today SDK is essentially `src/index.ts` (the re-export) + `src/index.test.ts` (a full-surface guard asserting every re-exported symbol resolves). Shape logic and its review belong in the protocol repo, not here.
-            - One runtime dep: `@ideaspaces/protocol`, pinned to a tag. ESM-only via `tsc`; tests via vitest.
-            - Reference: monorepo CLAUDE.md (root principles); `@ideaspaces/protocol` for the shape itself.
+            - This repo: `@ideaspaces/sdk` — the **platform transport layer**. It owns the Keeper event vocabulary and the Pi→Keeper translator.
+            - Portable repository shape belongs in `@ideaspaces/protocol`, which consumers import directly. SDK's transitional protocol re-export is intentionally ending in 0.2 rather than becoming a permanent compatibility barrel.
+            - Concrete agent-tool signatures are harness-owned. The transitional `COMMON_TOOL_CONTRACT` test policy is also intentionally ending rather than moving elsewhere.
+            - SDK should have zero runtime dependencies after the 0.2 cleanup. ESM-only via `tsc`; tests via vitest.
+            - Reference: monorepo CLAUDE.md (root principles); `@ideaspaces/protocol` for portable shape.
 
             ## SLC label context
             - `slc:simple` / `slc:lovable` / `slc:complete`: quick validation for labeled dimensions, deeper review for unlabeled.
@@ -51,27 +52,29 @@ jobs:
             - Any unnecessary new abstractions?
 
             ### Lovable ❤️
-            - Consumers (cli, mcp-server, the plugin) import from `@ideaspaces/sdk` without ceremony; the re-export keeps that surface stable.
-            - Platform additions, when they come: clear types, predictable defaults, error paths fail safely.
-            - The re-export stays complete — if the protocol surface grows, consumers can reach it through the SDK.
+            - Keeper event types and translation helpers have clear names, predictable defaults, and safe error behavior.
+            - Consumers import portable shape directly from `@ideaspaces/protocol` and platform transport directly from `@ideaspaces/sdk`; package ownership is obvious at the import site.
+            - Breaking removals include concise migration guidance rather than retaining misleading compatibility aliases.
 
             ### Complete 🏁
-            - Tests cover happy paths AND edge cases (vitest with tmpdir fixtures preferred for fs-touching primitives)?
-            - No shape logic re-implemented here (it belongs in `@ideaspaces/protocol`); no unused imports or dead code.
-            - `tsc --noEmit` clean; `npm test` passes; `npm run build` produces ESM in `dist/`.
-            - Type exports (re-exports in `index.ts`) cover what consumers actually need.
+            - Tests cover the exact surviving public platform surface and translator behavior.
+            - No shape logic or harness-specific tool policy is implemented here; no unused exports, stale build artifacts, or dead code remain.
+            - `tsc --noEmit` is clean; `npm test` passes; `npm run build` produces only current ESM declarations and JavaScript in `dist/`.
+            - Packaging checks prove obsolete protocol and tool-contract artifacts cannot leak through a stale `dist/` directory.
 
             ## SDK-specific checks
-            - **Stay a thin re-export.** Shape primitives (frontmatter, `_agent/` contract, awareness, git, drift) live in `@ideaspaces/protocol`. Don't re-implement or fork them here.
-            - **Keep the re-export complete.** The full-surface guard test (`src/index.test.ts`) must assert every symbol consumers rely on; a protocol rename/drop should fail SDK CI loudly, not silently break consumers.
-            - **Protocol dep stays pinned** to a tag; bump deliberately.
-            - **Platform code, when added,** is the only thing that belongs here (sync/auth/API client) — functional API, async I/O, cross-platform paths via `node:path`.
+            - **Keep the ownership boundary strict.** Shape primitives (frontmatter, `_agent/` contract, awareness, git, drift) live in `@ideaspaces/protocol`; concrete tool signatures and cross-field validation live in each harness.
+            - **Keep the platform surface evidenced.** Today that means Keeper transport + Pi→Keeper translation. Do not speculate auth, sync, spaces, graph, or API-client abstractions without a real consumer.
+            - **Keep SDK zero-runtime-dependency.** Prefer platform-neutral types and pure translation; additions must earn any dependency.
+            - **Guard the shipped package, not just source.** Clean before build/prepare and check the exact current export/package surface so deleted artifacts cannot survive in `dist/`.
+            - **Treat 0.2 removals as intentional.** Do not request restoration of the protocol re-export, protocol dependency, `COMMON_TOOL_CONTRACT`, or `./tool-contract` export.
 
             ## Anti-pattern detection 🚨
-            - Re-implementing or forking shape logic that belongs in `@ideaspaces/protocol`.
-            - Speculative platform API no consumer needs yet.
-            - Adding runtime deps without earning them (SDK's only runtime dep is `@ideaspaces/protocol`; stdlib + Node primitives first).
-            - Letting the re-export drift from the protocol's actual surface.
+            - Re-implementing, wrapping, or re-exporting shape that belongs in `@ideaspaces/protocol`.
+            - Centralizing concrete MCP/Pi/Claude tool signatures in the SDK.
+            - Speculative platform API no evidenced consumer needs yet.
+            - Adding runtime dependencies without earning them.
+            - Allowing stale `dist/` files or package exports to preserve removed APIs accidentally.
 
             ## Output format
 

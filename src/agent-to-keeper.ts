@@ -37,6 +37,19 @@ export interface PiAssistantMessageEvent {
   delta?: string;
 }
 
+/** A message in `agent_end`'s `messages` array — structural mirror of pi-ai's
+ *  `Message`; we only read the fields that reveal a provider-side turn failure. */
+export interface PiAgentEndMessage {
+  role: string;
+  /** Set on the assistant's final message. `"error"` means the provider call
+   *  itself failed (rate limit, quota, auth, ...) — the turn did not actually
+   *  produce a response, however clean the surrounding agent_start/agent_end
+   *  bookends look. */
+  stopReason?: string;
+  /** Present alongside `stopReason: "error"` — the provider's own error text. */
+  errorMessage?: string;
+}
+
 /** Structural mirror of pi-agent-core's `AgentEvent` — the fields we translate. */
 export type PiAgentEvent =
   | { type: "agent_start" }
@@ -48,7 +61,7 @@ export type PiAgentEvent =
   | { type: "tool_execution_start"; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: "tool_execution_update"; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
-  | { type: "agent_end" };
+  | { type: "agent_end"; messages?: PiAgentEndMessage[] };
 
 /** A completed tool call, with enough context for a connector to classify it. */
 export interface ToolInvocation {
@@ -164,6 +177,15 @@ export class KeeperTranslator {
       }
       case "agent_end": {
         if (this.ended) return [];
+        // A provider-side failure (rate limit, quota, auth, ...) still closes
+        // agent_start/agent_end cleanly — pi's own error lives on the final
+        // assistant message's stopReason/errorMessage, not in a distinct event
+        // type. Miss this and the turn looks like a normal success with an
+        // empty response instead of a visible failure.
+        const lastAssistant = [...(ev.messages ?? [])].reverse().find((m) => m.role === "assistant");
+        if (lastAssistant?.stopReason === "error") {
+          return [this.error("pi_error", lastAssistant.errorMessage || "The model provider returned an error.")];
+        }
         this.ended = true;
         const usage = this.cfg.finalUsage();
         const result: KeeperTurnResult = {

@@ -210,6 +210,16 @@ describe("ClaudeTranslator — failure inside a clean result", () => {
     expect(out.some((e) => e.type === "turn_complete")).toBe(false);
   });
 
+  it("prefers the result's errors[] — the shape a missing --resume session produces", () => {
+    const out = run([
+      { type: "result", subtype: "error_during_execution", is_error: true, num_turns: 0, session_id: "gone", errors: ["No conversation found with session ID: gone"] },
+    ]);
+    expect(out).toEqual([
+      { type: "message_start", conversation_id: "gone", model_tier: "" },
+      { type: "error", error_type: "claude_error_during_execution", message: "No conversation found with session ID: gone" },
+    ]);
+  });
+
   it("falls back to a generic message when the result carries no text", () => {
     const out = run([init, { type: "result", subtype: "error_during_execution", is_error: true }]);
     expect(out.at(-1)).toEqual({

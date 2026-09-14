@@ -79,6 +79,8 @@ export type ClaudeStreamLine =
       total_cost_usd?: number;
       usage?: ClaudeApiUsage;
       permission_denials?: unknown[];
+      /** Set on a failed run — e.g. "No conversation found with session ID: …". */
+      errors?: string[];
     }
   | { type: string };
 
@@ -301,7 +303,10 @@ export class ClaudeTranslator {
       // Claude Code closes an aborted or failed run with a `result` too —
       // `error_max_turns`, `error_during_execution`, ... — and the text it
       // carries is the error, not a response.
-      const message = res.result?.trim() || `Claude Code ended the turn with ${res.subtype}.`;
+      const message =
+        res.errors?.filter(Boolean).join("\n") ||
+        res.result?.trim() ||
+        `Claude Code ended the turn with ${res.subtype}.`;
       return [...opened, this.error(`claude_${res.subtype}`, message)];
     }
     this.ended = true;

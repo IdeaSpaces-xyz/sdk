@@ -102,6 +102,58 @@ describe("KeeperTranslator — the multi-turn fold", () => {
   });
 });
 
+describe("KeeperTranslator — provider failure inside a clean agent_end", () => {
+  // pi still closes agent_start/agent_end normally when the provider call
+  // itself fails (rate limit, quota, auth) — the failure lives on the final
+  // assistant message's stopReason/errorMessage, not a distinct event type.
+  it("emits error, not turn_complete, when the last assistant message has stopReason: error", () => {
+    const out = run([
+      { type: "agent_start" },
+      { type: "turn_start" },
+      {
+        type: "agent_end",
+        messages: [
+          { role: "user" },
+          { role: "assistant", stopReason: "error", errorMessage: "You're out of extra usage." },
+        ],
+      },
+    ]);
+    expect(out).toEqual([
+      { type: "message_start", conversation_id: "conv1", model_tier: "opus" },
+      { type: "error", error_type: "pi_error", message: "You're out of extra usage." },
+    ]);
+  });
+
+  it("falls back to a generic message when errorMessage is missing", () => {
+    const out = run([
+      { type: "agent_start" },
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "error" }] },
+    ]);
+    expect(out).toEqual([
+      { type: "message_start", conversation_id: "conv1", model_tier: "opus" },
+      { type: "error", error_type: "pi_error", message: "The model provider returned an error." },
+    ]);
+  });
+
+  it("marks the translator ended so a later event is ignored", () => {
+    const t = new KeeperTranslator({ conversationId: "c", modelTier: "opus" });
+    t.translate({ type: "agent_start" });
+    t.translate({ type: "agent_end", messages: [{ role: "assistant", stopReason: "error", errorMessage: "boom" }] });
+    expect(t.isEnded).toBe(true);
+    expect(t.translate({ type: "agent_end" })).toEqual([]);
+  });
+
+  it("still completes normally when the last assistant message has no stopReason: error", () => {
+    const out = run([
+      { type: "agent_start" },
+      td("Hello"),
+      { type: "agent_end", messages: [{ role: "user" }, { role: "assistant", stopReason: "stop" }] },
+    ]);
+    expect(out.some((e) => e.type === "turn_complete")).toBe(true);
+    expect(out.some((e) => e.type === "error")).toBe(false);
+  });
+});
+
 describe("KeeperTranslator — injected workspace harvest", () => {
   it("passes the turn's tool invocations to harvestWorkspace and surfaces the result", () => {
     let seen: ToolInvocation[] = [];

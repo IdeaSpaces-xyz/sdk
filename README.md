@@ -47,9 +47,9 @@ for (const line of stdoutLines) {
 if (!claude.isEnded) emit(claude.error("claude_exit", "Claude Code exited without a result."));
 ```
 
-`normalizeClaudeInvocation` rewrites Claude's `Write`/`Edit`/`Read` calls into
-the pi-shaped `write`/`edit`/`read` with `path`, so one workspace harvest serves
-both runtimes.
+Both translators hand `harvestWorkspace` the runtime's own tool names and
+inputs; which of them touch files is the connector's knowledge, not this
+package's.
 
 ## Migrating to 0.2
 

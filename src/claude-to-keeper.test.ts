@@ -1,13 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import {
-  ClaudeTranslator,
-  claudeToolBaseName,
-  normalizeClaudeInvocation,
-  parseClaudeStreamLine,
-  type ClaudeStreamLine,
-} from "./claude-to-keeper.js";
+import { ClaudeTranslator, parseClaudeStreamLine, type ClaudeStreamLine } from "./claude-to-keeper.js";
 import { KeeperTranslator, type PiAgentEvent, type ToolInvocation } from "./agent-to-keeper.js";
 import type { KeeperStreamEvent, KeeperTurnCompleteEvent } from "./keeper-events.js";
 
@@ -248,25 +242,6 @@ describe("parseClaudeStreamLine", () => {
   });
 });
 
-describe("Claude tool names for the workspace harvest", () => {
-  it("strips the MCP server prefix", () => {
-    expect(claudeToolBaseName("mcp__plugin_ideaspaces_core__is_write")).toBe("is_write");
-    expect(claudeToolBaseName("Write")).toBe("Write");
-  });
-
-  it("rewrites native file tools into the pi-shaped write/edit/read with `path`", () => {
-    const inv = (name: string, args: Record<string, unknown>): ToolInvocation => ({ name, args, result: null, isError: false });
-    expect(normalizeClaudeInvocation(inv("Write", { file_path: "/s/a.md", content: "x" }))).toMatchObject({ name: "write", args: { path: "/s/a.md" } });
-    expect(normalizeClaudeInvocation(inv("Edit", { file_path: "/s/a.md" }))).toMatchObject({ name: "edit", args: { path: "/s/a.md" } });
-    expect(normalizeClaudeInvocation(inv("MultiEdit", { file_path: "/s/a.md" }))).toMatchObject({ name: "edit" });
-    expect(normalizeClaudeInvocation(inv("NotebookEdit", { notebook_path: "/s/n.ipynb" }))).toMatchObject({ name: "edit", args: { path: "/s/n.ipynb" } });
-    expect(normalizeClaudeInvocation(inv("Read", { file_path: "/s/a.md" }))).toMatchObject({ name: "read", args: { path: "/s/a.md" } });
-    expect(normalizeClaudeInvocation(inv("mcp__plugin_ideaspaces_core__is_write", { path: "n.md" }))).toMatchObject({ name: "is_write", args: { path: "n.md" } });
-    const bash = inv("Bash", { command: "ls" });
-    expect(normalizeClaudeInvocation(bash)).toBe(bash);
-  });
-});
-
 describe("ClaudeTranslator — the recorded fixture", () => {
   // Write a note, read it back, say "done": two API messages, two tool calls.
   const lines = fixtureLines();
@@ -327,16 +302,17 @@ describe("ClaudeTranslator — the recorded fixture", () => {
     const claudeDone = claudeOut.at(-1) as KeeperTurnCompleteEvent;
     expect(claudeDone.result.response).toBe(piDone.result.response);
     expect(claudeDone.result.iterations).toBe(piDone.result.iterations);
-    expect(claudeDone.result.tool_calls.map((c) => normalizeClaudeInvocation({ ...c, result: null, isError: c.is_error }).name))
-      .toEqual(piDone.result.tool_calls.map((c) => c.name));
+    // Tool names differ by runtime (Write/Read vs write/read) — the connector's
+    // harvest reconciles them; the event shape is what both must agree on.
+    expect(claudeDone.result.tool_calls.map((c) => c.name.toLowerCase())).toEqual(piDone.result.tool_calls.map((c) => c.name));
   });
 
-  it("harvests the written and read note through the normalised invocations", () => {
+  it("hands the harvest Claude's own tool names and inputs, untouched", () => {
     let harvested: ToolInvocation[] = [];
-    run(lines, { harvestWorkspace: (tools: ToolInvocation[]) => { harvested = tools.map(normalizeClaudeInvocation); return { created: [], modified: [], deleted: [], read: [], mentioned: [] }; } });
-    expect(harvested.map((t) => [t.name, t.args.path])).toEqual([
-      ["write", "/home/user/space/notes/hello.md"],
-      ["read", "/home/user/space/notes/hello.md"],
+    run(lines, { harvestWorkspace: (tools: ToolInvocation[]) => { harvested = tools; return { created: [], modified: [], deleted: [], read: [], mentioned: [] }; } });
+    expect(harvested.map((t) => [t.name, t.args.file_path])).toEqual([
+      ["Write", "/home/user/space/notes/hello.md"],
+      ["Read", "/home/user/space/notes/hello.md"],
     ]);
   });
 });

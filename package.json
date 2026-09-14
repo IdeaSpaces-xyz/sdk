@@ -1,7 +1,7 @@
 {
   "name": "@ideaspaces/sdk",
   "version": "0.3.0",
-  "description": "Keeper transport types and Pi-to-Keeper translation for IdeaSpaces",
+  "description": "Keeper transport types and Pi/Claude Code-to-Keeper translation for IdeaSpaces",
   "type": "module",
   "exports": {
     ".": {

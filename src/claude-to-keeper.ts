@@ -110,7 +110,9 @@ export interface ClaudeTranslatorConfig {
   /** Injectable clock for tool durations. Default `Date.now`. */
   now?: () => number;
   /** Connector-aware workspace harvest from the turn's tool calls. Default empty.
-   *  Invocations carry Claude's own tool names; see {@link normalizeClaudeInvocation}. */
+   *  Invocations carry Claude Code's own tool names and inputs, untouched — which
+   *  names touch files and where the path lives is the connector's knowledge,
+   *  as it is for pi. */
   harvestWorkspace?: (tools: ToolInvocation[]) => KeeperWorkspaceSurface;
   /** Render a tool result into a short preview string. Default: text/JSON, truncated. */
   toolResultPreview?: (result: unknown) => string;
@@ -335,40 +337,4 @@ export class ClaudeTranslator {
     u.cost_usd = costUsd;
     return u;
   }
-}
-
-/**
- * Which Claude Code tools touch files, and where the path lives in their input.
- * Settled by the recorded run: the native file tools take `file_path`
- * (`NotebookEdit` takes `notebook_path`); MCP tools arrive as
- * `mcp__<server>__<tool>`, so `is_write` from the ideaspaces plugin is reached
- * through {@link claudeToolBaseName}.
- */
-export const CLAUDE_FILE_TOOLS: Readonly<Record<string, { kind: "write" | "edit" | "read"; pathArg: string }>> = {
-  Write: { kind: "write", pathArg: "file_path" },
-  Edit: { kind: "edit", pathArg: "file_path" },
-  MultiEdit: { kind: "edit", pathArg: "file_path" },
-  NotebookEdit: { kind: "edit", pathArg: "notebook_path" },
-  Read: { kind: "read", pathArg: "file_path" },
-};
-
-/** `mcp__plugin_ideaspaces_core__is_write` → `is_write`; native names pass through. */
-export function claudeToolBaseName(name: string): string {
-  const m = /^mcp__.+?__(.+)$/u.exec(name);
-  return m ? m[1] : name;
-}
-
-/**
- * Rewrite a Claude tool invocation into the pi-shaped one a workspace harvest
- * already understands: lower-case `write`/`edit`/`read` with `path`, MCP names
- * stripped to their base. Everything else passes through untouched.
- */
-export function normalizeClaudeInvocation(inv: ToolInvocation): ToolInvocation {
-  const file = CLAUDE_FILE_TOOLS[inv.name];
-  if (file) {
-    const path = inv.args[file.pathArg];
-    return { ...inv, name: file.kind, args: { ...inv.args, path } };
-  }
-  const base = claudeToolBaseName(inv.name);
-  return base === inv.name ? inv : { ...inv, name: base };
 }

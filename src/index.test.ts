@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import * as sdk from "./index.js";
 
 const PUBLIC_RUNTIME_EXPORTS = [
+  "ClaudeTranslator",
   "KEEPER_STREAM_EVENT_TYPES",
   "KeeperTranslator",
   "defaultToolResultPreview",
   "emptyWorkspaceSurface",
+  "parseClaudeStreamLine",
   "zeroUsage",
 ] as const;
 

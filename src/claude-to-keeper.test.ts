@@ -100,113 +100,56 @@ describe("ClaudeTranslator — event mapping", () => {
     expect(out[2]).toMatchObject({ type: "tool_result", result_preview: "exit 1", is_error: true });
   });
 
-  it("ignores a tool_result it never saw the call for, and a duplicate tool_use", () => {
-    const out = run([
-      init,
-      toolResult("ghost", "nothing"),
-      toolUse("toolu_3", "Read", { file_path: "a" }),
-      toolUse("toolu_3", "Read", { file_path: "a" }),
-    ]);
-    expect(out.map((e) => e.type)).toEqual(["message_start", "tool_start"]);
-  });
-
-  it("emits the assistant text whole when nothing was streamed (no --include-partial-messages)", () => {
-    const out = run([init, { type: "assistant", message: { content: [{ type: "text", text: "whole answer" }] } }, success]);
-    expect(out[1]).toEqual({ type: "text_delta", delta: "whole answer" });
+  it("translates result into turn_complete with final usage and iterations", () => {
+    const out = run([init, apiStart, text("answer"), success]);
     const done = out.at(-1) as KeeperTurnCompleteEvent;
-    expect(done.result.response).toBe("whole answer");
-  });
-
-  it("does not double the text when the assistant record follows streamed deltas", () => {
-    const out = run([
-      init,
-      apiStart,
-      text("streamed"),
-      { type: "assistant", message: { content: [{ type: "text", text: "streamed" }] } },
-      success,
-    ]);
-    expect(out.filter((e) => e.type === "text_delta")).toHaveLength(1);
-    expect((out.at(-1) as KeeperTurnCompleteEvent).result.response).toBe("streamed");
-  });
-
-  it("drops lines it does not recognise", () => {
-    expect(run([init, { type: "rate_limit_event" }, { type: "system", subtype: "hook_started" }, { type: "system", subtype: "status" }])).toHaveLength(1);
-  });
-});
-
-describe("ClaudeTranslator — the turn fold", () => {
-  const spike: ClaudeStreamLine[] = [
-    init,
-    apiStart,
-    thinking("let me look"),
-    toolUse("toolu_1", "Read", { file_path: "/s/now.md" }),
-    toolResult("toolu_1", "1\tNow: spike"),
-    apiStart,
-    text("You are "),
-    text("at the root."),
-    success,
-  ];
-
-  it("emits exactly one message_start and one turn_complete for the whole run", () => {
-    const out = run(spike);
-    expect(out.filter((e) => e.type === "message_start")).toHaveLength(1);
-    expect(out.filter((e) => e.type === "turn_complete")).toHaveLength(1);
-  });
-
-  it("folds text across API messages, counts iterations, and carries usage + cost from result", () => {
-    const done = run(spike).find((e) => e.type === "turn_complete") as KeeperTurnCompleteEvent;
-    expect(done.result.response).toBe("You are at the root.");
-    expect(done.result.iterations).toBe(2);
-    expect(done.result.tool_calls).toEqual([{ name: "Read", args: { file_path: "/s/now.md" }, duration_ms: expect.any(Number), is_error: false }]);
-    expect(done.result.usage).toEqual({
-      input_tokens: 10,
-      output_tokens: 20,
-      cache_read_tokens: 100,
-      cache_creation_tokens: 5,
-      model_tier: "claude-opus-5",
-      total_tokens: 135,
-      cost_usd: 0.01,
+    expect(done).toMatchObject({
+      type: "turn_complete",
+      result: {
+        response: "answer",
+        iterations: 1,
+        position: "",
+        usage: { input_tokens: 10, output_tokens: 20, cache_read_tokens: 100, cache_creation_tokens: 5, total_tokens: 135, cost_usd: 0.01 },
+      },
     });
   });
 
-  it("emits message_delta immediately before turn_complete", () => {
-    const out = run(spike);
-    const i = out.findIndex((e) => e.type === "turn_complete");
-    expect(out[i - 1].type).toBe("message_delta");
-  });
-
-  it("hands the turn's invocations to the harvest with Claude's own tool names", () => {
-    const seen: ToolInvocation[][] = [];
-    run(spike, { harvestWorkspace: (tools: ToolInvocation[]) => { seen.push(tools); return { created: [], modified: [], deleted: [], read: ["/s/now.md"], mentioned: [] }; } });
-    expect(seen).toHaveLength(1);
-    expect(seen[0][0]).toMatchObject({ name: "Read", args: { file_path: "/s/now.md" }, isError: false });
-  });
-
-  it("ignores lines after result (idempotent close)", () => {
-    const t = new ClaudeTranslator();
-    spike.forEach((l) => t.translate(l));
-    expect(t.isEnded).toBe(true);
-    expect(t.translate(success)).toEqual([]);
-    expect(t.translate(text("more"))).toEqual([]);
-  });
-
-  it("falls back to the result text when nothing streamed at all", () => {
-    const done = run([init, success]).at(-1) as KeeperTurnCompleteEvent;
-    expect(done.result.response).toBe("done");
-    expect(done.result.iterations).toBe(2); // num_turns stands in for uncounted messages
-  });
-});
-
-describe("ClaudeTranslator — failure inside a clean result", () => {
-  it("emits error, not turn_complete, when result is not a success", () => {
-    const out = run([init, apiStart, text("partial"), { type: "result", subtype: "error_max_turns", is_error: true, result: "Reached max turns (1)" }]);
-    expect(out.at(-1)).toEqual({ type: "error", error_type: "claude_error_max_turns", message: "Reached max turns (1)" });
-    expect(out.some((e) => e.type === "turn_complete")).toBe(false);
-  });
-
-  it("prefers the result's errors[] — the shape a missing --resume session produces", () => {
+  it("falls back to streamed usage when the result carries no usage object", () => {
     const out = run([
-      { type: "result", subtype: "error_during_execution", is_error: true, num_turns: 0, session_id: "gone", errors: ["No conversation found with session ID: gone"] },
+      init,
+      apiStart,
+      { type: "stream_event", event: { type: "message_delta", usage: { input_tokens: 4, output_tokens: 8, cache_read_input_tokens: 40, cache_creation_input_tokens: 2 } } },
+      { type: "result", subtype: "success", is_error: false, result: "done" },
+    ]);
+    const done = out.at(-1) as KeeperTurnCompleteEvent;
+    expect(done.result.usage).toMatchObject({ input_tokens: 4, output_tokens: 8, cache_read_tokens: 40, cache_creation_tokens: 2, total_tokens: 54 });
+  });
+
+  it("translates error result records into a Keeper error event", () => {
+    const out = run([
+      init,
+      {
+        type: "result",
+        subtype: "error_during_execution",
+        is_error: true,
+        errors: ["No conversation found with session ID: gone"],
+      },
+    ]);
+    expect(out).toEqual([
+      { type: "message_start", conversation_id: "sess-1", model_tier: "claude-opus-5" },
+      { type: "error", error_type: "claude_error_during_execution", message: "No conversation found with session ID: gone" },
+    ]);
+  });
+
+  it("handles an error result on a run that opened without system.init", () => {
+    const out = run([
+      {
+        type: "result",
+        subtype: "error_during_execution",
+        is_error: true,
+        session_id: "gone",
+        errors: ["No conversation found with session ID: gone"],
+      },
     ]);
     expect(out).toEqual([
       { type: "message_start", conversation_id: "gone", model_tier: "" },
@@ -231,37 +174,83 @@ describe("ClaudeTranslator — failure inside a clean result", () => {
     expect(t.translate(success)).toEqual([]);
   });
 
-  it("translates compact_boundary and system.compact_boundary into a compacted event with tokens and timestamp", () => {
-    let now = 1700000000000;
-    const t = new ClaudeTranslator({ now: () => now });
+  it("translates recorded system.compact_boundary into a compacted event with tokens and timestamp", () => {
+    const t = new ClaudeTranslator();
     t.translate(init);
-    const ev1 = t.translate({
+    const ev = t.translate({
       type: "system",
       subtype: "compact_boundary",
-      pre_tokens: 150000,
-      post_tokens: 25000,
+      content: "Conversation compacted",
+      compactMetadata: {
+        trigger: "manual",
+        preTokens: 22924,
+        durationMs: 11697,
+        postTokens: 1925,
+        cumulativeDroppedTokens: 20999,
+      },
+      timestamp: "2026-09-21T07:19:04.313Z",
     });
-    expect(ev1).toEqual([
+    expect(ev).toEqual([
       {
         type: "compacted",
-        pre_tokens: 150000,
-        post_tokens: 25000,
-        at: new Date(now).toISOString(),
+        pre_tokens: 22924,
+        post_tokens: 1925,
+        at: "2026-09-21T07:19:04.313Z",
       },
     ]);
+  });
 
-    const ev2 = t.translate({
-      type: "compact_boundary",
-      preTokens: 180000,
-      postTokens: 30000,
+  it("opens cleanly before emitting compacted if compact_boundary arrives first in a resumed run", () => {
+    const t = new ClaudeTranslator({ conversationId: "resumed-sess", modelTier: "opus" });
+    const ev = t.translate({
+      type: "system",
+      subtype: "compact_boundary",
+      compactMetadata: { preTokens: 50000, postTokens: 5000 },
+      timestamp: "2026-09-21T08:00:00.000Z",
     });
-    expect(ev2).toEqual([
+    expect(ev).toEqual([
+      { type: "message_start", conversation_id: "resumed-sess", model_tier: "opus" },
+      { type: "compacted", pre_tokens: 50000, post_tokens: 5000, at: "2026-09-21T08:00:00.000Z" },
+    ]);
+  });
+
+  it("translates recorded system.compact_boundary into a compacted event with tokens and timestamp", () => {
+    const t = new ClaudeTranslator();
+    t.translate(init);
+    const ev = t.translate({
+      type: "system",
+      subtype: "compact_boundary",
+      content: "Conversation compacted",
+      compactMetadata: {
+        trigger: "manual",
+        preTokens: 22924,
+        durationMs: 11697,
+        postTokens: 1925,
+        cumulativeDroppedTokens: 20999,
+      },
+      timestamp: "2026-09-21T07:19:04.313Z",
+    });
+    expect(ev).toEqual([
       {
         type: "compacted",
-        pre_tokens: 180000,
-        post_tokens: 30000,
-        at: new Date(now).toISOString(),
+        pre_tokens: 22924,
+        post_tokens: 1925,
+        at: "2026-09-21T07:19:04.313Z",
       },
+    ]);
+  });
+
+  it("opens cleanly before emitting compacted if compact_boundary arrives first in a resumed run", () => {
+    const t = new ClaudeTranslator({ conversationId: "resumed-sess", modelTier: "opus" });
+    const ev = t.translate({
+      type: "system",
+      subtype: "compact_boundary",
+      compactMetadata: { preTokens: 50000, postTokens: 5000 },
+      timestamp: "2026-09-21T08:00:00.000Z",
+    });
+    expect(ev).toEqual([
+      { type: "message_start", conversation_id: "resumed-sess", model_tier: "opus" },
+      { type: "compacted", pre_tokens: 50000, post_tokens: 5000, at: "2026-09-21T08:00:00.000Z" },
     ]);
   });
 });

@@ -114,7 +114,7 @@ export interface KeeperCompactedEvent {
   type: "compacted";
   pre_tokens?: number;
   post_tokens?: number;
-  at?: string;
+  at: string;
 }
 
 export interface KeeperCancelledEvent {

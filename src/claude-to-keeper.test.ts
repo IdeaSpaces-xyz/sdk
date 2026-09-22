@@ -132,6 +132,46 @@ describe("ClaudeTranslator — event mapping", () => {
   it("drops lines it does not recognise", () => {
     expect(run([init, { type: "rate_limit_event" }, { type: "system", subtype: "hook_started" }, { type: "system", subtype: "status" }])).toHaveLength(1);
   });
+
+  it("translates recorded system.compact_boundary into a compacted event with tokens and timestamp", () => {
+    const t = new ClaudeTranslator();
+    t.translate(init);
+    const ev = t.translate({
+      type: "system",
+      subtype: "compact_boundary",
+      content: "Conversation compacted",
+      compactMetadata: {
+        trigger: "manual",
+        preTokens: 22924,
+        durationMs: 11697,
+        postTokens: 1925,
+        cumulativeDroppedTokens: 20999,
+      },
+      timestamp: "2026-09-21T07:19:04.313Z",
+    });
+    expect(ev).toEqual([
+      {
+        type: "compacted",
+        pre_tokens: 22924,
+        post_tokens: 1925,
+        at: "2026-09-21T07:19:04.313Z",
+      },
+    ]);
+  });
+
+  it("opens cleanly before emitting compacted if compact_boundary arrives first in a resumed run", () => {
+    const t = new ClaudeTranslator({ conversationId: "resumed-sess", modelTier: "opus" });
+    const ev = t.translate({
+      type: "system",
+      subtype: "compact_boundary",
+      compactMetadata: { preTokens: 50000, postTokens: 5000 },
+      timestamp: "2026-09-21T08:00:00.000Z",
+    });
+    expect(ev).toEqual([
+      { type: "message_start", conversation_id: "resumed-sess", model_tier: "opus" },
+      { type: "compacted", pre_tokens: 50000, post_tokens: 5000, at: "2026-09-21T08:00:00.000Z" },
+    ]);
+  });
 });
 
 describe("ClaudeTranslator — the turn fold", () => {
@@ -309,7 +349,7 @@ describe("ClaudeTranslator — the recorded fixture", () => {
 
   it("hands the harvest Claude's own tool names and inputs, untouched", () => {
     let harvested: ToolInvocation[] = [];
-    run(lines, { harvestWorkspace: (tools: ToolInvocation[]) => { harvested = tools; return { created: [], modified: [], deleted: [], read: [], mentioned: [] }; } });
+    run(lines, { harvestWorkspace: (tools: ToolInvocation[]) => { harvested = tools; return { created: [], modified: [], deleted: [], read: ["/s/now.md"], mentioned: [] }; } });
     expect(harvested.map((t) => [t.name, t.args.file_path])).toEqual([
       ["Write", "/home/user/space/notes/hello.md"],
       ["Read", "/home/user/space/notes/hello.md"],

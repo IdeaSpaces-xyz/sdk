@@ -28,6 +28,7 @@
 
 import { defaultToolResultPreview, type ToolInvocation } from "./agent-to-keeper.js";
 import {
+  type KeeperCompactedEvent,
   type KeeperStreamEvent,
   type KeeperToolCallSummary,
   type KeeperTurnResult,
@@ -62,9 +63,25 @@ export interface ClaudeApiUsage {
   cache_creation_input_tokens?: number;
 }
 
+export interface ClaudeCompactMetadata {
+  trigger?: "manual" | "auto" | string;
+  preTokens?: number;
+  postTokens?: number;
+  durationMs?: number;
+  cumulativeDroppedTokens?: number;
+}
+
 /** Structural mirror of a Claude Code stream-json line — the fields we translate. */
 export type ClaudeStreamLine =
   | { type: "system"; subtype: "init"; session_id: string; model?: string; cwd?: string; permissionMode?: string; claude_code_version?: string }
+  | {
+      type: "system";
+      subtype: "compact_boundary";
+      session_id?: string;
+      content?: string;
+      compactMetadata?: ClaudeCompactMetadata;
+      timestamp?: string;
+    }
   | { type: "system"; subtype: string; session_id?: string }
   | { type: "stream_event"; event: ClaudeApiStreamEvent; session_id?: string }
   | { type: "assistant"; message: { content: ClaudeContentBlock[] }; session_id?: string }
@@ -163,9 +180,15 @@ export class ClaudeTranslator {
     switch (line.type) {
       case "system": {
         const sys = line as Extract<ClaudeStreamLine, { type: "system" }>;
-        if (sys.subtype !== "init") return [];
-        const init = sys as Extract<ClaudeStreamLine, { subtype: "init" }>;
-        return this.open(init.session_id, init.model);
+        if (sys.subtype === "init") {
+          const init = sys as Extract<ClaudeStreamLine, { subtype: "init" }>;
+          return this.open(init.session_id, init.model);
+        }
+        if (sys.subtype === "compact_boundary") {
+          const bound = sys as Extract<ClaudeStreamLine, { subtype: "compact_boundary" }>;
+          return this.translateCompactBoundary(bound);
+        }
+        return [];
       }
       case "stream_event":
         return this.translateStreamEvent((line as Extract<ClaudeStreamLine, { type: "stream_event" }>).event);
@@ -210,6 +233,20 @@ export class ClaudeTranslator {
     this.conversationId = this.cfg.conversationId ?? sessionId ?? "";
     this.modelTier = this.cfg.modelTier ?? model ?? "";
     return [{ type: "message_start", conversation_id: this.conversationId, model_tier: this.modelTier }];
+  }
+
+  private translateCompactBoundary(data: Extract<ClaudeStreamLine, { subtype: "compact_boundary" }>): KeeperStreamEvent[] {
+    const opened = this.open(data.session_id);
+    const pre = typeof data.compactMetadata?.preTokens === "number" ? data.compactMetadata.preTokens : undefined;
+    const post = typeof data.compactMetadata?.postTokens === "number" ? data.compactMetadata.postTokens : undefined;
+    const at = typeof data.timestamp === "string" && data.timestamp ? data.timestamp : new Date(this.cfg.now()).toISOString();
+    const ev: KeeperCompactedEvent = {
+      type: "compacted",
+      ...(pre !== undefined ? { pre_tokens: pre } : {}),
+      ...(post !== undefined ? { post_tokens: post } : {}),
+      at,
+    };
+    return [...opened, ev];
   }
 
   private translateStreamEvent(ev: ClaudeApiStreamEvent): KeeperStreamEvent[] {

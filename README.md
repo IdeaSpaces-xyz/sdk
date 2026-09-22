@@ -32,7 +32,7 @@ const events: KeeperStreamEvent[] = translator.translate({
 });
 ```
 
-The same nine events from a headless Claude Code run
+The same ten events from a headless Claude Code run
 (`claude -p --output-format stream-json --include-partial-messages`), one
 stdout line at a time:
 

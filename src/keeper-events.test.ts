@@ -11,7 +11,7 @@ import {
 // clients (desktop keeper-types, sw_space Keeper) that must speak the same shape.
 
 describe("Keeper event contract", () => {
-  it("declares exactly the nine stream event types", () => {
+  it("declares exactly the ten stream event types", () => {
     expect([...KEEPER_STREAM_EVENT_TYPES]).toEqual([
       "message_start",
       "thinking_delta",
@@ -20,6 +20,7 @@ describe("Keeper event contract", () => {
       "tool_result",
       "message_delta",
       "turn_complete",
+      "compacted",
       "cancelled",
       "error",
     ]);
@@ -57,5 +58,15 @@ describe("Keeper event contract", () => {
       },
     };
     expect(ev.type).toBe("turn_complete");
+  });
+
+  it("compacted event carries before/after tokens and timestamp", () => {
+    const ev: KeeperStreamEvent = {
+      type: "compacted",
+      pre_tokens: 150000,
+      post_tokens: 25000,
+      at: "2026-09-22T10:00:00.000Z",
+    };
+    expect(ev.type).toBe("compacted");
   });
 });

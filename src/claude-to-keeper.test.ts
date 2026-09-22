@@ -230,6 +230,40 @@ describe("ClaudeTranslator — failure inside a clean result", () => {
     expect(t.isEnded).toBe(true);
     expect(t.translate(success)).toEqual([]);
   });
+
+  it("translates compact_boundary and system.compact_boundary into a compacted event with tokens and timestamp", () => {
+    let now = 1700000000000;
+    const t = new ClaudeTranslator({ now: () => now });
+    t.translate(init);
+    const ev1 = t.translate({
+      type: "system",
+      subtype: "compact_boundary",
+      pre_tokens: 150000,
+      post_tokens: 25000,
+    });
+    expect(ev1).toEqual([
+      {
+        type: "compacted",
+        pre_tokens: 150000,
+        post_tokens: 25000,
+        at: new Date(now).toISOString(),
+      },
+    ]);
+
+    const ev2 = t.translate({
+      type: "compact_boundary",
+      preTokens: 180000,
+      postTokens: 30000,
+    });
+    expect(ev2).toEqual([
+      {
+        type: "compacted",
+        pre_tokens: 180000,
+        post_tokens: 30000,
+        at: new Date(now).toISOString(),
+      },
+    ]);
+  });
 });
 
 describe("parseClaudeStreamLine", () => {

@@ -12,7 +12,7 @@
  * The sw_space Keeper (Python) also produces this shape; keep the two in step.
  */
 
-/** The nine event kinds a turn stream emits, in JSON-lines. */
+/** The ten event kinds a turn stream emits, in JSON-lines. */
 export const KEEPER_STREAM_EVENT_TYPES = [
   "message_start",
   "thinking_delta",
@@ -21,6 +21,7 @@ export const KEEPER_STREAM_EVENT_TYPES = [
   "tool_result",
   "message_delta",
   "turn_complete",
+  "compacted",
   "cancelled",
   "error",
 ] as const;
@@ -109,6 +110,13 @@ export interface KeeperTurnCompleteEvent {
   name?: string;
 }
 
+export interface KeeperCompactedEvent {
+  type: "compacted";
+  pre_tokens?: number;
+  post_tokens?: number;
+  at?: string;
+}
+
 export interface KeeperCancelledEvent {
   type: "cancelled";
   reason: string;
@@ -128,6 +136,7 @@ export type KeeperStreamEvent =
   | KeeperToolResultEvent
   | KeeperMessageDeltaEvent
   | KeeperTurnCompleteEvent
+  | KeeperCompactedEvent
   | KeeperCancelledEvent
   | KeeperErrorEvent;
 

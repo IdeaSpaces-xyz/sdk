@@ -77,8 +77,12 @@ export interface KeeperMessageStartEvent {
   added_dirs?: string[];
   /** Null means the runtime has no permission-mode mechanism; absent for hosted turns. */
   permission_mode?: string | null;
-  /** Null means the runtime has no purpose-level tool allowlist; absent for hosted turns. */
+  /** Null means the runtime has no tool-preapproval list; absent for hosted turns. */
   allowed_tools?: string[] | null;
+  /** Claude --allowedTools preapproves these names; it does not restrict others. */
+  allowed_tools_semantics?: "preapproval";
+  /** False means shell commands are not bounded by the listed preapprovals. */
+  shell_bounded?: boolean;
   runtime?: "claude" | "pi";
   /** Concrete model ID (model_tier remains the coarse accounting tier). */
   model?: string;

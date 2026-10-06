@@ -11,6 +11,21 @@ import {
 // clients (desktop keeper-types, sw_space Keeper) that must speak the same shape.
 
 describe("Keeper event contract", () => {
+  it("types both hosted minimal starts and locally disclosed reach", () => {
+    const hosted: KeeperStreamEvent = { type: "message_start", conversation_id: "c1", model_tier: "haiku" };
+    const local: KeeperStreamEvent = {
+      ...hosted, cwd: "/space/agents/scout", added_dirs: ["/space"],
+      permission_mode: "acceptEdits", allowed_tools: ["Read"], runtime: "claude", model: "haiku",
+    };
+    const pi: KeeperStreamEvent = {
+      ...hosted, cwd: "/space/agents/scout", added_dirs: [], permission_mode: null,
+      allowed_tools: null, runtime: "pi", model: "google/gemini", extensions: ["/extension.ts"], trust: "saved",
+    };
+    expect(hosted).not.toHaveProperty("cwd");
+    expect(local.added_dirs).toEqual(["/space"]);
+    expect(pi.allowed_tools).toBeNull();
+  });
+
   it("declares exactly the ten stream event types", () => {
     expect([...KEEPER_STREAM_EVENT_TYPES]).toEqual([
       "message_start",

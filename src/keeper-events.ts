@@ -71,6 +71,18 @@ export interface KeeperMessageStartEvent {
   type: "message_start";
   conversation_id: string;
   model_tier: string;
+  /** Local launcher disclosure. Absent for hosted turns. */
+  cwd?: string;
+  /** Directories actually granted by the runtime (not merely discovered). */
+  added_dirs?: string[];
+  permission_mode?: string | null;
+  /** Null means the runtime has no purpose-level tool allowlist. */
+  allowed_tools?: string[] | null;
+  runtime?: "claude" | "pi";
+  model?: string | null;
+  /** Pi's executable extension paths and trust policy, when applicable. */
+  extensions?: string[];
+  trust?: "saved" | "explicit";
 }
 
 export interface KeeperThinkingDeltaEvent {

@@ -16,7 +16,7 @@ describe("Keeper event contract", () => {
     const local: KeeperStreamEvent = {
       ...hosted, cwd: "/space/agents/scout", added_dirs: ["/space"],
       permission_mode: "acceptEdits", allowed_tools: ["Read"], allowed_tools_semantics: "preapproval",
-      shell_bounded: false, runtime: "claude", model: "haiku",
+      shell_available: true, runtime: "claude", model: "haiku",
     };
     const pi: KeeperStreamEvent = {
       ...hosted, cwd: "/space/agents/scout", added_dirs: [], permission_mode: null,
@@ -24,7 +24,9 @@ describe("Keeper event contract", () => {
     };
     expect(hosted).not.toHaveProperty("cwd");
     expect(local.added_dirs).toEqual(["/space"]);
-    expect(local.shell_bounded).toBe(false);
+    expect(local.shell_available).toBe(true);
+    const ask: KeeperStreamEvent = { ...local, allowed_tools: ["Read"], shell_available: false };
+    expect(ask.shell_available).toBe(false);
     expect(pi.allowed_tools).toBeNull();
   });
 

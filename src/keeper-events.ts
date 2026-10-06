@@ -79,10 +79,10 @@ export interface KeeperMessageStartEvent {
   permission_mode?: string | null;
   /** Null means the runtime has no tool-preapproval list; absent for hosted turns. */
   allowed_tools?: string[] | null;
-  /** Claude --allowedTools preapproves these names; it does not restrict others. */
-  allowed_tools_semantics?: "preapproval";
-  /** True: shell tool unavailable. False: shell commands not bounded by preapprovals. */
-  shell_bounded?: boolean;
+  /** Preapproval permits named tools but does not restrict other tools; absent for hosted/Pi. */
+  allowed_tools_semantics?: "preapproval" | "restriction";
+  /** Whether a shell tool is available; absent for hosted/Pi, false on read-only Claude runs. */
+  shell_available?: boolean;
   runtime?: "claude" | "pi";
   /** Concrete model ID (model_tier remains the coarse accounting tier). */
   model?: string;

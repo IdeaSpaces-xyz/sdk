@@ -81,7 +81,7 @@ export interface KeeperMessageStartEvent {
   allowed_tools?: string[] | null;
   /** Claude --allowedTools preapproves these names; it does not restrict others. */
   allowed_tools_semantics?: "preapproval";
-  /** False means shell commands are not bounded by the listed preapprovals. */
+  /** True: shell tool unavailable. False: shell commands not bounded by preapprovals. */
   shell_bounded?: boolean;
   runtime?: "claude" | "pi";
   /** Concrete model ID (model_tier remains the coarse accounting tier). */

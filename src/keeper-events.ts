@@ -67,6 +67,19 @@ export interface KeeperTurnResult {
   workspace: KeeperWorkspaceSurface;
 }
 
+export interface KeeperThreadReceipt {
+  /** The Thread identifier (local folder slug or hosted exchange id `x_...`). */
+  thread: string;
+  /** Authored title or Thread name. */
+  name?: string;
+  /** Number of posts or messages in the Thread. */
+  post_count: number;
+  /** Participant names or post authors. */
+  people: string[];
+  /** Authored Map note or attachment reference; null when no Map was supplied. */
+  map: string | null;
+}
+
 export interface KeeperMessageStartEvent {
   type: "message_start";
   conversation_id: string;
@@ -90,6 +103,8 @@ export interface KeeperMessageStartEvent {
   /** Pi's executable extension paths and trust policy, when applicable. */
   extensions?: string[];
   trust?: "saved" | "explicit";
+  /** Injected by the local launcher, not by the Pi/Claude translators. Absent for turns not bound to a Thread. */
+  thread?: KeeperThreadReceipt;
 }
 
 export interface KeeperThinkingDeltaEvent {

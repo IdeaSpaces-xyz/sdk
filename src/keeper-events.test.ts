@@ -22,6 +22,19 @@ describe("Keeper event contract", () => {
       ...hosted, cwd: "/space/agents/scout", added_dirs: [], permission_mode: null,
       allowed_tools: null, runtime: "pi", model: "google/gemini", extensions: ["/extension.ts"], trust: "saved",
     };
+    const threadDisclosed: KeeperStreamEvent = {
+      ...local,
+      thread: {
+        thread: "2026-09-30-space-loop-desktop",
+        name: "Space loop desktop",
+        post_count: 5,
+        people: ["Steward", "UI/UX", "Integrator"],
+        map: "home.map.md#0",
+      },
+    };
+    expect(hosted).not.toHaveProperty("thread");
+    expect(threadDisclosed.thread?.thread).toBe("2026-09-30-space-loop-desktop");
+    expect(threadDisclosed.thread?.post_count).toBe(5);
     expect(hosted).not.toHaveProperty("cwd");
     expect(local.added_dirs).toEqual(["/space"]);
     expect(local.shell_available).toBe(true);

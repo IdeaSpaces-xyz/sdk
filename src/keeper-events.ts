@@ -90,11 +90,17 @@ export interface KeeperMessageStartEvent {
   /** Pi's executable extension paths and trust policy, when applicable. */
   extensions?: string[];
   trust?: "saved" | "explicit";
-  /** Read receipt of Thread context provided to the agent. */
+  /** Read receipt of Thread context provided to the agent. Absent for turns not bound to a Thread. */
   thread?: {
+    /** The Thread identifier (local folder slug or hosted exchange id `x_...`). */
     thread: string;
+    /** Authored title or Thread name. */
+    name?: string;
+    /** Number of posts or messages in the Thread. */
     post_count: number;
+    /** Participant names or post authors. */
     people: string[];
+    /** Authored Map note or attachment reference, or null when absent. */
     map?: string | null;
   };
 }

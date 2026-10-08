@@ -67,6 +67,19 @@ export interface KeeperTurnResult {
   workspace: KeeperWorkspaceSurface;
 }
 
+export interface KeeperThreadReceipt {
+  /** The Thread identifier (local folder slug or hosted exchange id `x_...`). */
+  thread: string;
+  /** Authored title or Thread name. */
+  name?: string;
+  /** Number of posts or messages in the Thread. */
+  post_count: number;
+  /** Participant names or post authors. */
+  people: string[];
+  /** Authored Map note or attachment reference, or null when absent. */
+  map?: string | null;
+}
+
 export interface KeeperMessageStartEvent {
   type: "message_start";
   conversation_id: string;
@@ -91,18 +104,7 @@ export interface KeeperMessageStartEvent {
   extensions?: string[];
   trust?: "saved" | "explicit";
   /** Read receipt of Thread context provided to the agent. Absent for turns not bound to a Thread. */
-  thread?: {
-    /** The Thread identifier (local folder slug or hosted exchange id `x_...`). */
-    thread: string;
-    /** Authored title or Thread name. */
-    name?: string;
-    /** Number of posts or messages in the Thread. */
-    post_count: number;
-    /** Participant names or post authors. */
-    people: string[];
-    /** Authored Map note or attachment reference, or null when absent. */
-    map?: string | null;
-  };
+  thread?: KeeperThreadReceipt;
 }
 
 export interface KeeperThinkingDeltaEvent {

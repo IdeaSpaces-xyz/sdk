@@ -76,8 +76,8 @@ export interface KeeperThreadReceipt {
   post_count: number;
   /** Participant names or post authors. */
   people: string[];
-  /** Authored Map note or attachment reference, or null when absent. */
-  map?: string | null;
+  /** Authored Map note or attachment reference; null when no Map was supplied. */
+  map: string | null;
 }
 
 export interface KeeperMessageStartEvent {
@@ -103,7 +103,7 @@ export interface KeeperMessageStartEvent {
   /** Pi's executable extension paths and trust policy, when applicable. */
   extensions?: string[];
   trust?: "saved" | "explicit";
-  /** Read receipt of Thread context provided to the agent. Absent for turns not bound to a Thread. */
+  /** Injected by the local launcher, not by the Pi/Claude translators. Absent for turns not bound to a Thread. */
   thread?: KeeperThreadReceipt;
 }
 

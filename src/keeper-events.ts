@@ -90,6 +90,13 @@ export interface KeeperMessageStartEvent {
   /** Pi's executable extension paths and trust policy, when applicable. */
   extensions?: string[];
   trust?: "saved" | "explicit";
+  /** Read receipt of Thread context provided to the agent. */
+  thread?: {
+    thread: string;
+    post_count: number;
+    people: string[];
+    map?: string | null;
+  };
 }
 
 export interface KeeperThinkingDeltaEvent {

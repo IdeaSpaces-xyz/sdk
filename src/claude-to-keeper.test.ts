@@ -358,7 +358,7 @@ describe("ClaudeTranslator — the recorded fixture", () => {
 
   it("ignores intermediate task-notification result records and yields the subsequent prompt response", () => {
     const notifyLines: ClaudeStreamLine[] = [
-      { type: "system", subtype: "task_notification", session_id: "s1" } as any,
+      { type: "system", subtype: "task_notification", session_id: "s1" },
       { type: "system", subtype: "init", session_id: "s1", model: "claude-haiku-4-5-20251001" },
       {
         type: "result",
@@ -367,9 +367,7 @@ describe("ClaudeTranslator — the recorded fixture", () => {
         session_id: "s1",
         num_turns: 0,
         origin: { kind: "task-notification" },
-        result_index: 0,
-        queued_turn_count: 0,
-      } as any,
+      },
       {
         type: "stream_event",
         event: {
@@ -384,8 +382,7 @@ describe("ClaudeTranslator — the recorded fixture", () => {
         result: "BLUEBERRY",
         session_id: "s1",
         num_turns: 1,
-        result_index: 1,
-      } as any,
+      },
     ];
     const out = run(notifyLines);
     expect(out.map((e) => e.type)).toEqual([

@@ -96,6 +96,7 @@ export type ClaudeStreamLine =
       total_cost_usd?: number;
       usage?: ClaudeApiUsage;
       permission_denials?: unknown[];
+      origin?: { kind?: string };
       /** Set on a failed run — e.g. "No conversation found with session ID: …". */
       errors?: string[];
     }
@@ -337,6 +338,11 @@ export class ClaudeTranslator {
   }
 
   private translateResult(res: Extract<ClaudeStreamLine, { type: "result" }>): KeeperStreamEvent[] {
+    if (res.origin?.kind === "task-notification") {
+      // Intermediate result record emitted when Claude Code drains a background
+      // task notification on resume before processing the prompt.
+      return [];
+    }
     const opened = this.open(res.session_id);
     if (res.is_error || res.subtype !== "success") {
       // Claude Code closes an aborted or failed run with a `result` too —

@@ -143,6 +143,74 @@ describe("KeeperTranslator — provider failure inside a clean agent_end", () =>
     expect(t.translate({ type: "agent_end" })).toEqual([]);
   });
 
+  it("translates token usage and cost from assistant messages into KeeperUsage", () => {
+    const out = run([
+      { type: "agent_start" },
+      {
+        type: "agent_end",
+        messages: [
+          {
+            role: "assistant",
+            usage: {
+              input: 1200,
+              output: 150,
+              cacheRead: 800,
+              cacheWrite: 200,
+              totalTokens: 2350,
+              cost: { input: 0.0012, output: 0.0015, cacheRead: 0.0004, cacheWrite: 0.0005, total: 0.0036 },
+            },
+          },
+          {
+            role: "assistant",
+            usage: {
+              input: 1500,
+              output: 250,
+              cacheRead: 1000,
+              cacheWrite: 0,
+              totalTokens: 2750,
+              cost: { input: 0.0015, output: 0.0025, cacheRead: 0.0005, cacheWrite: 0, total: 0.0045 },
+            },
+          },
+        ],
+      },
+    ]);
+    const delta = out.find((e) => e.type === "message_delta");
+    const complete = out.find((e) => e.type === "turn_complete") as KeeperTurnCompleteEvent;
+    expect(delta).toBeDefined();
+    expect(complete).toBeDefined();
+    expect(complete.result.usage).toEqual({
+      input_tokens: 2700,
+      output_tokens: 400,
+      cache_read_tokens: 1800,
+      cache_creation_tokens: 200,
+      model_tier: "opus",
+      total_tokens: 5100,
+      cost_usd: 0.0081,
+    });
+    expect(delta).toEqual({ type: "message_delta", usage: complete.result.usage });
+  });
+
+  it("falls back to finalUsage when agent_end messages carry no usage", () => {
+    const fallbackUsage = {
+      input_tokens: 10,
+      output_tokens: 20,
+      cache_read_tokens: 0,
+      cache_creation_tokens: 0,
+      model_tier: "opus",
+      total_tokens: 30,
+      cost_usd: 0.0001,
+    };
+    const out = run(
+      [
+        { type: "agent_start" },
+        { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      ],
+      { finalUsage: () => fallbackUsage },
+    );
+    const complete = out.find((e) => e.type === "turn_complete") as KeeperTurnCompleteEvent;
+    expect(complete.result.usage).toEqual(fallbackUsage);
+  });
+
   it("still completes normally when the last assistant message has no stopReason: error", () => {
     const out = run([
       { type: "agent_start" },
@@ -151,6 +219,38 @@ describe("KeeperTranslator — provider failure inside a clean agent_end", () =>
     ]);
     expect(out.some((e) => e.type === "turn_complete")).toBe(true);
     expect(out.some((e) => e.type === "error")).toBe(false);
+  });
+
+  it("emits cancelled when the last assistant message has stopReason: aborted", () => {
+    const out = run([
+      { type: "agent_start" },
+      {
+        type: "agent_end",
+        messages: [
+          { role: "assistant", stopReason: "aborted", errorMessage: "Operation aborted" },
+        ],
+      },
+    ]);
+    expect(out).toEqual([
+      { type: "message_start", conversation_id: "conv1", model_tier: "opus" },
+      { type: "cancelled", reason: "Operation aborted" },
+    ]);
+  });
+
+  it("falls back to reason 'aborted' when stopReason is aborted and errorMessage is absent", () => {
+    const out = run([
+      { type: "agent_start" },
+      {
+        type: "agent_end",
+        messages: [
+          { role: "assistant", stopReason: "aborted" },
+        ],
+      },
+    ]);
+    expect(out).toEqual([
+      { type: "message_start", conversation_id: "conv1", model_tier: "opus" },
+      { type: "cancelled", reason: "aborted" },
+    ]);
   });
 });
 

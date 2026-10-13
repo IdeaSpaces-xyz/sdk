@@ -37,8 +37,23 @@ export interface PiAssistantMessageEvent {
   delta?: string;
 }
 
+export interface PiUsage {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  totalTokens?: number;
+  cost?: {
+    input?: number;
+    output?: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+    total?: number;
+  };
+}
+
 /** A message in `agent_end`'s `messages` array — structural mirror of pi-ai's
- *  `Message`; we only read the fields that reveal a provider-side turn failure. */
+ *  `Message`; we only read the fields that reveal a provider-side turn failure or usage. */
 export interface PiAgentEndMessage {
   role: string;
   /** Set on the assistant's final message. `"error"` means the provider call
@@ -48,6 +63,8 @@ export interface PiAgentEndMessage {
   stopReason?: string;
   /** Present alongside `stopReason: "error"` — the provider's own error text. */
   errorMessage?: string;
+  /** Token and cost accounting. */
+  usage?: PiUsage;
 }
 
 /** Structural mirror of pi-agent-core's `AgentEvent` — the fields we translate. */
@@ -62,6 +79,46 @@ export type PiAgentEvent =
   | { type: "tool_execution_update"; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
   | { type: "agent_end"; messages?: PiAgentEndMessage[] };
+
+/** Aggregate token counts and cost across assistant messages in one Pi run. */
+function sumPiUsage(messages: PiAgentEndMessage[] | undefined, modelTier: string): KeeperUsage | undefined {
+  if (!messages || messages.length === 0) return undefined;
+  const assistantMessages = messages.filter((m) => m.role === "assistant" && m.usage);
+  if (assistantMessages.length === 0) return undefined;
+
+  let input_tokens = 0;
+  let output_tokens = 0;
+  let cache_read_tokens = 0;
+  let cache_creation_tokens = 0;
+  let total_tokens = 0;
+  let cost_usd = 0;
+
+  for (const msg of assistantMessages) {
+    const u = msg.usage!;
+    const inp = u.input ?? 0;
+    const out = u.output ?? 0;
+    const read = u.cacheRead ?? 0;
+    const write = u.cacheWrite ?? 0;
+    input_tokens += inp;
+    output_tokens += out;
+    cache_read_tokens += read;
+    cache_creation_tokens += write;
+    total_tokens += u.totalTokens ?? (inp + out + read + write);
+    if (u.cost && typeof u.cost.total === "number") {
+      cost_usd += u.cost.total;
+    }
+  }
+
+  return {
+    input_tokens,
+    output_tokens,
+    cache_read_tokens,
+    cache_creation_tokens,
+    model_tier: modelTier,
+    total_tokens,
+    cost_usd: Number(cost_usd.toFixed(6)),
+  };
+}
 
 /** A completed tool call, with enough context for a connector to classify it. */
 export interface ToolInvocation {
@@ -80,7 +137,7 @@ export interface KeeperTranslatorConfig {
   now?: () => number;
   /** Connector-aware workspace harvest from the turn's tool calls. Default empty. */
   harvestWorkspace?: (tools: ToolInvocation[]) => KeeperWorkspaceSurface;
-  /** Final token accounting. Default zeros for the tier. */
+  /** Final token accounting fallback when agent_end carries no assistant usage. Default zeros for the tier. */
   finalUsage?: () => KeeperUsage;
   /** Render a tool result into a short preview string. Default: text/JSON, truncated. */
   toolResultPreview?: (result: unknown) => string;
@@ -186,8 +243,12 @@ export class KeeperTranslator {
         if (lastAssistant?.stopReason === "error") {
           return [this.error("pi_error", lastAssistant.errorMessage || "The model provider returned an error.")];
         }
+        if (lastAssistant?.stopReason === "aborted") {
+          return [this.cancelled(lastAssistant.errorMessage || "aborted")];
+        }
         this.ended = true;
-        const usage = this.cfg.finalUsage();
+
+        const usage = sumPiUsage(ev.messages, this.cfg.modelTier) ?? this.cfg.finalUsage();
         const result: KeeperTurnResult = {
           response: this.responseText,
           usage,

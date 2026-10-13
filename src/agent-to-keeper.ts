@@ -71,14 +71,54 @@ export interface PiAgentEndMessage {
 export type PiAgentEvent =
   | { type: "agent_start" }
   | { type: "turn_start" }
-  | { type: "turn_end"; message?: { role: string; usage?: PiUsage; stopReason?: string; errorMessage?: string } }
+  | { type: "turn_end" }
   | { type: "message_start" }
   | { type: "message_update"; assistantMessageEvent: PiAssistantMessageEvent }
-  | { type: "message_end"; message?: { role: string; usage?: PiUsage; stopReason?: string; errorMessage?: string } }
+  | { type: "message_end" }
   | { type: "tool_execution_start"; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: "tool_execution_update"; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
   | { type: "agent_end"; messages?: PiAgentEndMessage[] };
+
+/** Aggregate token counts and cost across assistant messages in one Pi run. */
+function sumPiUsage(messages: PiAgentEndMessage[] | undefined, modelTier: string): KeeperUsage | undefined {
+  if (!messages || messages.length === 0) return undefined;
+  const assistantMessages = messages.filter((m) => m.role === "assistant" && m.usage);
+  if (assistantMessages.length === 0) return undefined;
+
+  let input_tokens = 0;
+  let output_tokens = 0;
+  let cache_read_tokens = 0;
+  let cache_creation_tokens = 0;
+  let total_tokens = 0;
+  let cost_usd = 0;
+
+  for (const msg of assistantMessages) {
+    const u = msg.usage!;
+    const inp = u.input ?? 0;
+    const out = u.output ?? 0;
+    const read = u.cacheRead ?? 0;
+    const write = u.cacheWrite ?? 0;
+    input_tokens += inp;
+    output_tokens += out;
+    cache_read_tokens += read;
+    cache_creation_tokens += write;
+    total_tokens += u.totalTokens ?? (inp + out + read + write);
+    if (u.cost && typeof u.cost.total === "number") {
+      cost_usd += u.cost.total;
+    }
+  }
+
+  return {
+    input_tokens,
+    output_tokens,
+    cache_read_tokens,
+    cache_creation_tokens,
+    model_tier: modelTier,
+    total_tokens,
+    cost_usd: Number(cost_usd.toFixed(6)),
+  };
+}
 
 /** A completed tool call, with enough context for a connector to classify it. */
 export interface ToolInvocation {
@@ -97,7 +137,7 @@ export interface KeeperTranslatorConfig {
   now?: () => number;
   /** Connector-aware workspace harvest from the turn's tool calls. Default empty. */
   harvestWorkspace?: (tools: ToolInvocation[]) => KeeperWorkspaceSurface;
-  /** Final token accounting. Default zeros for the tier. */
+  /** Final token accounting fallback when agent_end carries no assistant usage. Default zeros for the tier. */
   finalUsage?: () => KeeperUsage;
   /** Render a tool result into a short preview string. Default: text/JSON, truncated. */
   toolResultPreview?: (result: unknown) => string;
@@ -208,43 +248,7 @@ export class KeeperTranslator {
         }
         this.ended = true;
 
-        let usage = this.cfg.finalUsage();
-        if (ev.messages && ev.messages.length > 0) {
-          let input = 0;
-          let output = 0;
-          let cacheRead = 0;
-          let cacheWrite = 0;
-          let totalTokens = 0;
-          let costUsd = 0;
-          let hasUsage = false;
-
-          for (const msg of ev.messages) {
-            if (msg.role === "assistant" && msg.usage) {
-              hasUsage = true;
-              input += msg.usage.input ?? 0;
-              output += msg.usage.output ?? 0;
-              cacheRead += msg.usage.cacheRead ?? 0;
-              cacheWrite += msg.usage.cacheWrite ?? 0;
-              totalTokens += msg.usage.totalTokens ?? 0;
-              if (msg.usage.cost) {
-                costUsd += msg.usage.cost.total ?? 0;
-              }
-            }
-          }
-
-          if (hasUsage) {
-            usage = {
-              input_tokens: input,
-              output_tokens: output,
-              cache_read_tokens: cacheRead,
-              cache_creation_tokens: cacheWrite,
-              model_tier: this.cfg.modelTier,
-              total_tokens: totalTokens || (input + output + cacheRead + cacheWrite),
-              cost_usd: costUsd,
-            };
-          }
-        }
-
+        const usage = sumPiUsage(ev.messages, this.cfg.modelTier) ?? this.cfg.finalUsage();
         const result: KeeperTurnResult = {
           response: this.responseText,
           usage,

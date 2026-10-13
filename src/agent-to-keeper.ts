@@ -37,8 +37,23 @@ export interface PiAssistantMessageEvent {
   delta?: string;
 }
 
+export interface PiUsage {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  totalTokens?: number;
+  cost?: {
+    input?: number;
+    output?: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+    total?: number;
+  };
+}
+
 /** A message in `agent_end`'s `messages` array — structural mirror of pi-ai's
- *  `Message`; we only read the fields that reveal a provider-side turn failure. */
+ *  `Message`; we only read the fields that reveal a provider-side turn failure or usage. */
 export interface PiAgentEndMessage {
   role: string;
   /** Set on the assistant's final message. `"error"` means the provider call
@@ -48,16 +63,18 @@ export interface PiAgentEndMessage {
   stopReason?: string;
   /** Present alongside `stopReason: "error"` — the provider's own error text. */
   errorMessage?: string;
+  /** Token and cost accounting. */
+  usage?: PiUsage;
 }
 
 /** Structural mirror of pi-agent-core's `AgentEvent` — the fields we translate. */
 export type PiAgentEvent =
   | { type: "agent_start" }
   | { type: "turn_start" }
-  | { type: "turn_end" }
+  | { type: "turn_end"; message?: { role: string; usage?: PiUsage; stopReason?: string; errorMessage?: string } }
   | { type: "message_start" }
   | { type: "message_update"; assistantMessageEvent: PiAssistantMessageEvent }
-  | { type: "message_end" }
+  | { type: "message_end"; message?: { role: string; usage?: PiUsage; stopReason?: string; errorMessage?: string } }
   | { type: "tool_execution_start"; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: "tool_execution_update"; toolCallId: string; toolName: string; args: Record<string, unknown> }
   | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
@@ -186,8 +203,48 @@ export class KeeperTranslator {
         if (lastAssistant?.stopReason === "error") {
           return [this.error("pi_error", lastAssistant.errorMessage || "The model provider returned an error.")];
         }
+        if (lastAssistant?.stopReason === "aborted") {
+          return [this.cancelled(lastAssistant.errorMessage || "aborted")];
+        }
         this.ended = true;
-        const usage = this.cfg.finalUsage();
+
+        let usage = this.cfg.finalUsage();
+        if (ev.messages && ev.messages.length > 0) {
+          let input = 0;
+          let output = 0;
+          let cacheRead = 0;
+          let cacheWrite = 0;
+          let totalTokens = 0;
+          let costUsd = 0;
+          let hasUsage = false;
+
+          for (const msg of ev.messages) {
+            if (msg.role === "assistant" && msg.usage) {
+              hasUsage = true;
+              input += msg.usage.input ?? 0;
+              output += msg.usage.output ?? 0;
+              cacheRead += msg.usage.cacheRead ?? 0;
+              cacheWrite += msg.usage.cacheWrite ?? 0;
+              totalTokens += msg.usage.totalTokens ?? 0;
+              if (msg.usage.cost) {
+                costUsd += msg.usage.cost.total ?? 0;
+              }
+            }
+          }
+
+          if (hasUsage) {
+            usage = {
+              input_tokens: input,
+              output_tokens: output,
+              cache_read_tokens: cacheRead,
+              cache_creation_tokens: cacheWrite,
+              model_tier: this.cfg.modelTier,
+              total_tokens: totalTokens || (input + output + cacheRead + cacheWrite),
+              cost_usd: costUsd,
+            };
+          }
+        }
+
         const result: KeeperTurnResult = {
           response: this.responseText,
           usage,
